@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Upload</title>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/css/base/bootstrap.min.css"/>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/css/font-awesome/css/font-awesome.min.css"/>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/element-ui/theme-chalk/index.css"/>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/css/page/testUpload.css">
+</head>
+<body>
+<div id="app">
+    <el-card class="form-horizontal">
+        <div class="form-group">
+            <label class="col-sm-2 control-label"
+                   style="width: 110px;font-weight: bold">Image:</label>
+            <div class="col-sm-10">
+                <img id="imgShow" src=""/>
+                <div id="imgChange" class="cursorPointer" style="width: 72px">
+                    <i class="fa fa-plus fa-5x"></i>
+                </div>
+                <input id="imgFile" type="file"
+                       style="display: none"
+                       accept="image/*"/>
+            </div>
+        </div>
+        <el-button type="success" @click="upLoad()">upLoad</el-button>
+    </el-card>
+</div>
+</body>
+<script type="text/javascript" src="/static/js/common/jquery-3.3.1.js"></script>
+<script src="/static/js/common/bootstrap.min.js"></script>
+<script type="text/javascript" src="/static/js/common/axios.min.js"></script>
+<script type="text/javascript" src="/static/js/common/vue.min.js"></script>
+<script src="/static/element-ui/index.js"></script>
+<script src="/static/element-ui/umd/locale/en.js"></script>
+<script type="text/javascript" src="/static/js/page/testUpload.js"></script>
+<script src="/static/element-ui/index.js"></script>
+<script type="text/javascript" src="/static/iCheck/jquery.icheck.min.js"></script>
+
+</html>

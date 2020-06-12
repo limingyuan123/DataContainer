@@ -1,0 +1,10 @@
+#imgChange {
+    border: 1px solid #ccc;
+    width: 100px;
+    height: 100px;
+    text-align: center;
+    line-height: 150px;
+    vertical-align: middle;
+    color: #ccc;
+    float: left;
+}
