@@ -9,5 +9,4 @@ import org.springframework.data.mongodb.repository.MongoRepository;
  */
 public interface ImageDao extends MongoRepository<Image,String> {
     Image findByOid(String oid);
-
 }

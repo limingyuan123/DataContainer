@@ -26,7 +26,22 @@
                        accept="image/*"/>
             </div>
         </div>
-        <el-button type="success" @click="upLoad()">upLoad</el-button>
+        <el-button type="success" @click="upLoad">上传图片</el-button>
+        <div class="form-group flexColContainer" style="margin-bottom: -15px">
+            <label style="margin-right:5px;font-size: 1.4rem">Upload files :</label>
+            <el-button size="mini" @click="selectFile()">Select File</el-button>
+        </div>
+        <el-upload
+                class="upload-demo"
+                multiple="true"
+                ref="upload"
+                :on-change="uploadChange"
+                :auto-upload="false">
+            <el-button id="uploadFile" style="display:none" slot="trigger" size="small"
+                       type="primary">选取文件
+            </el-button>
+        </el-upload>
+        <el-button type="success" @click="submitUpload">上传文件</el-button>
     </el-card>
 </div>
 </body>

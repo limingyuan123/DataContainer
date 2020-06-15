@@ -8,3 +8,7 @@
     color: #ccc;
     float: left;
 }
+
+.el-upload__input{
+    display: none!important;
+}
