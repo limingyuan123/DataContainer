@@ -7,7 +7,8 @@ var testUpload = new Vue({
             upLoadName:"testData",
             userId:"65",
             serverNode:"china",
-            origination:"portal"
+            origination:"portal",
+            selectValue:"1816a01c-343a-472e-027c-6390fe3eba70"
         }
     },
     methods:{
@@ -81,6 +82,7 @@ var testUpload = new Vue({
             }).done((res)=>{
                 if (res.code==0){
                     let data = res.data;
+                    this.$message.success('Upload success');
                 }else{
                     this.$message.error('Upload failed');
                 }

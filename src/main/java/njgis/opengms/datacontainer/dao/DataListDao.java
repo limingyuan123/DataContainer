@@ -9,4 +9,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
  */
 public interface DataListDao extends MongoRepository<DataList, String> {
     DataList findByOid(String oid);
+    DataList findFirstByUid(String uid);
 }

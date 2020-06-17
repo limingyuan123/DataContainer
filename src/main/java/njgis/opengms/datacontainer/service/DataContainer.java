@@ -1,9 +1,13 @@
 package njgis.opengms.datacontainer.service;
 
 import lombok.extern.slf4j.Slf4j;
+import njgis.opengms.datacontainer.entity.DataList;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
 /**
  * @Auther mingyuan
  * @Data 2020.06.13 16:48
@@ -11,8 +15,7 @@ import java.io.*;
 @Service
 @Slf4j
 public class DataContainer {
-
-    public boolean uploadOGMS(String ogmsPath, MultipartFile[] files) {
+    public boolean uploadOGMS(String ogmsPath,MultipartFile[] files) {
 
         for (int i=0;i<files.length;i++) {
             MultipartFile file = files[i];
@@ -78,4 +81,141 @@ public class DataContainer {
             return true;
     }
 
+    public boolean uploadOGMSMulti(String ogmsPath, String uuid, MultipartFile[] files){
+        BufferedInputStream bis = null;
+        FileOutputStream fos = null;
+        ZipOutputStream zos = null;
+        InputStream inputStream = null;
+        DataList dataList = new DataList();
+        try {
+            File filePath = new File(ogmsPath);
+            if (!filePath.exists()){
+                filePath.mkdirs();
+            }
+
+//            File zip = File.createTempFile(uuid, ".zip",filePath);
+            String fileName = uuid + ".zip";
+            File zip = new File(filePath, fileName);
+            zip.createNewFile();
+            zos = new ZipOutputStream(new FileOutputStream(zip));
+            byte[] bufs = new byte[1024 * 10];
+
+
+            //如果为多个，则将上传的文件进行压缩，之后进行上传，配置文件不压缩
+            for (int i = 0; i < files.length; i++) {
+                //对文文件的全名进行截取然后在后缀名进行删选。
+                int begin = files[i].getOriginalFilename().indexOf(".");
+                int last = files[i].getOriginalFilename().length();
+                //获得文件后缀名
+                String a = files[i].getOriginalFilename().substring(begin, last);
+                //如文件为配置文件，则不压缩
+                if (a.endsWith(".udxcfg")){
+                    break;
+                }
+
+                inputStream = files[i].getInputStream();
+                String streamfilename = files[i].getOriginalFilename();
+
+                ZipEntry zipEntry = new ZipEntry(streamfilename);
+                zos.putNextEntry(zipEntry);
+
+                bis = new BufferedInputStream(inputStream, 1024 * 10);
+                int read = 0;
+                while ((read = bis.read(bufs, 0, 1024 * 10)) != -1) {
+                    zos.write(bufs, 0, read);
+                }
+            }
+            zos.flush();
+            zos.close();
+
+            inputStream = new FileInputStream(zip);
+        }catch (FileNotFoundException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        } finally {
+            // 关闭流
+            try {
+                if (null != bis)
+                    bis.close();
+                if (null != zos)
+                    zos.close();
+
+            } catch (IOException e) {
+                log.error("InputStream or OutputStream close error : {}", e);
+            }
+        }
+        //在该文件夹内，仍存储未压缩文件
+        uploadOGMS(ogmsPath,files);
+        return true;
+    }
+
+    //根据路径删除指定的目录或文件，无论存在与否
+    public boolean DeleteFolder(String sPath) {
+        boolean flag = false;
+
+        File file = new File(sPath);
+        // 判断目录或文件是否存在
+        if (!file.exists()) {  // 不存在返回 false
+            return flag;
+        } else {
+            // 判断是否为文件
+            if (file.isFile()) {  // 为文件时调用删除文件方法
+                return deleteFile(sPath);
+            } else {  // 为目录时调用删除目录方法
+                return deleteDirectory(sPath);
+            }
+        }
+    }
+
+     //删除单个文件
+    public boolean deleteFile(String sPath) {
+        boolean flag;
+        flag = false;
+        File file = new File(sPath);
+        // 路径为文件且不为空则进行删除
+        if (file.isFile() && file.exists()) {
+            file.delete();
+            flag = true;
+        }
+        return flag;
+    }
+
+    //删除目录（文件夹）以及目录下的文件
+    public boolean deleteDirectory(String sPath) {
+        boolean flag;
+
+        //如果sPath不以文件分隔符结尾，自动添加文件分隔符
+        if (!sPath.endsWith(File.separator)) {
+            sPath = sPath + File.separator;
+        }
+        File dirFile = new File(sPath);
+        //如果dir对应的文件不存在，或者不是一个目录，则退出
+        if (!dirFile.exists() || !dirFile.isDirectory()) {
+            return false;
+        }
+        flag = true;
+        //删除文件夹下的所有文件(包括子目录)
+        File[] files = dirFile.listFiles();
+        for (int i = 0; i < files.length; i++) {
+            //删除子文件
+            if (files[i].isFile()) {
+                flag = deleteFile(files[i].getAbsolutePath());
+                if (!flag) break;
+            } //删除子目录
+            else {
+                flag = deleteDirectory(files[i].getAbsolutePath());
+                if (!flag) break;
+            }
+        }
+        if (!flag) return false;
+        //删除当前目录
+        if (dirFile.delete()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }
