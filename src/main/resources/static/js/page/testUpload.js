@@ -72,7 +72,7 @@ var testUpload = new Vue({
             formData.append("serverNode",this.serverNode);
             formData.append("origination",this.origination);
             $.ajax({
-                url: "/uploadFile",
+                url: "/data",
                 type:"POST",
                 cache: false,
                 processData: false,

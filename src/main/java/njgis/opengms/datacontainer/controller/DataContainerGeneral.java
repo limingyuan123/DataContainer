@@ -42,12 +42,12 @@ public class DataContainerGeneral {
     @Autowired
     DataListDao dataListDao;
 //    @Value("E:/upload")
-    @Value("/upload")
-    private String resourcePath;
+////    @Value("/upload")
+//    private String resourcePath;
 
-//    @Value("E:/upload/upload_ogms")
-    @Value("/data/dataSource/upload_ogms")
-    private String ogmsPath;
+    @Value("${resourcePath}")
+//    @Value("/data/dataSource/upload_ogms")
+    private String resourcePath;
 
     //upload网页
     @RequestMapping("/testUpload")
@@ -82,7 +82,7 @@ public class DataContainerGeneral {
     }
 
     //接口1 批量上传ogms数据  含配置文件类
-    @RequestMapping(value = "/uploadFile", method = RequestMethod.POST)
+    @RequestMapping(value = "/data", method = RequestMethod.POST)
     public JsonResult uploadFile(@RequestParam("ogmsdata")MultipartFile[] files,
                                  @RequestParam("name")String uploadName,
                                  @RequestParam("userId")String userName,
@@ -103,6 +103,8 @@ public class DataContainerGeneral {
             return jsonResult;
         }
 
+        String ogmsPath;
+        ogmsPath = resourcePath + "/" + uuid;
         //文件检验
         if (files.length==0){
             loadFileLog = false;
@@ -138,7 +140,6 @@ public class DataContainerGeneral {
                 //获取根元素下所有的子元素
                 dataTemplateId = root.element("DataTemplate").getText();
                 DataTemplateType = root.element("DataTemplate").attribute("type").getText();
-                ogmsPath = ogmsPath + "/" + uuid;
                 //首先判断文件个数,一个文件也压缩上传
                 loadFileLog = dataContainer.uploadOGMSMulti(ogmsPath,uuid,files);
                 for (int i=0;i<files.length;i++){
@@ -184,7 +185,7 @@ public class DataContainerGeneral {
             jsonObject.put("file_name",uploadName);
             jsonResult.setData(jsonObject);
         }
-        return ResultUtils.success(jsonResult);
+        return jsonResult;
     }
     //接口2 下载数据
     @RequestMapping(value = "/data", method = RequestMethod.GET)
@@ -242,7 +243,7 @@ public class DataContainerGeneral {
             jsonResult.setMsg("delete fail");
         }
 
-        return ResultUtils.success(jsonResult);
+        return jsonResult;
     }
 
     //接口4 批量下载
