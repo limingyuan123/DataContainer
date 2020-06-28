@@ -9,7 +9,7 @@
 	<packaging>jar</packaging>
 
 	<name>DataContainer</name>
-	<description>Demo project for Spring Boot</description>
+	<description>OpenGMS Team Data Container</description>
 
 	<parent>
 		<groupId>org.springframework.boot</groupId>
@@ -49,10 +49,6 @@
 			<artifactId>spring-boot-devtools</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!--<dependency>-->
-			<!--<groupId>org.springframework</groupId>-->
-			<!--<artifactId>spring</artifactId>-->
-		<!--</dependency>-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-mongodb</artifactId>

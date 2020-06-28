@@ -14,6 +14,8 @@ import org.apache.catalina.servlet4preview.http.HttpServletRequest;
 import org.dom4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
@@ -39,10 +41,12 @@ public class DataContainerGeneral {
 
     @Autowired
     DataListDao dataListDao;
-    @Value("E:/upload")
+//    @Value("E:/upload")
+    @Value("/upload")
     private String resourcePath;
 
-    @Value("E:/upload/upload_ogms")
+//    @Value("E:/upload/upload_ogms")
+    @Value("/data/dataSource/upload_ogms")
     private String ogmsPath;
 
     //upload网页
@@ -53,6 +57,7 @@ public class DataContainerGeneral {
         return testUpload;
     }
 
+    //test接口
     @RequestMapping(value = "/uploadImg", method = RequestMethod.POST)
     public JsonResult  uploadImg(@RequestBody String img){
         Image image = new Image();
@@ -76,7 +81,7 @@ public class DataContainerGeneral {
         return jsonResult;
     }
 
-    //接口1 上传ogms数据
+    //接口1 批量上传ogms数据  含配置文件类
     @RequestMapping(value = "/uploadFile", method = RequestMethod.POST)
     public JsonResult uploadFile(@RequestParam("ogmsdata")MultipartFile[] files,
                                  @RequestParam("name")String uploadName,
@@ -85,7 +90,6 @@ public class DataContainerGeneral {
                                  @RequestParam("origination")String origination) throws IOException, DocumentException {
         JsonResult jsonResult = new JsonResult();
         boolean loadFileLog = false;
-
         Date now = new Date();
         DataList dataList = new DataList();
         String uuid = UUID.randomUUID().toString();
@@ -95,7 +99,7 @@ public class DataContainerGeneral {
         //参数检验
         if (uploadName==""||userName==""||serverNode==""||origination==""){
             jsonResult.setCode(-1);
-            jsonResult.setMsg("without name , userId ,origination, serverNode");
+            jsonResult.setMsg("without name or userId or origination or serverNode");
             return jsonResult;
         }
 
@@ -119,8 +123,7 @@ public class DataContainerGeneral {
         }else if (files.length>1){
             //有多个文件，且含有配置文件
             if (files[files.length-1].getOriginalFilename().equals("config.udxcfg")){
-                //检查配置文件格式
-                //String转xml，逐行读取配置文件内容
+                //检查配置文件格式 ,通过String转xml，逐行读取配置文件内容
                 Reader reader = null;
                 reader = new InputStreamReader(files[files.length-1].getInputStream(),"utf-8");
                 BufferedReader br = new BufferedReader(reader);
@@ -135,34 +138,30 @@ public class DataContainerGeneral {
                 //获取根元素下所有的子元素
                 dataTemplateId = root.element("DataTemplate").getText();
                 DataTemplateType = root.element("DataTemplate").attribute("type").getText();
-
-                //首先初始化ogmsPath
-                ogmsPath = "E:/upload/upload_ogms";
                 ogmsPath = ogmsPath + "/" + uuid;
                 //首先判断文件个数,一个文件也压缩上传
-//                if (files.length==2){
-//                    loadFileLog = dataContainer.uploadOGMS(ogmsPath,files);
-//                    String singleFileName = files[0].getOriginalFilename();
-//                    dataList.setSingleFileName(singleFileName);
-//                }else {
-                    loadFileLog = dataContainer.uploadOGMSMulti(ogmsPath,uuid,files);
-                    for (int i=0;i<files.length;i++){
-                        //fileList字段也不加入配置文件
-                        //对文文件的全名进行截取然后在后缀名进行删选。
-                        int begin = files[i].getOriginalFilename().indexOf(".");
-                        int last = files[i].getOriginalFilename().length();
-                        //获得文件后缀名
-                        String a = files[i].getOriginalFilename().substring(begin, last);
-                        if (a.endsWith(".udxcfg")){
-                            break;
-                        }
-                        fileList.add(ogmsPath + "/" + files[i].getOriginalFilename());
+                loadFileLog = dataContainer.uploadOGMSMulti(ogmsPath,uuid,files);
+                for (int i=0;i<files.length;i++){
+                    //fileList字段也不加入配置文件
+                    //对文文件的全名进行截取然后在后缀名进行删选。
+                    int begin = files[i].getOriginalFilename().indexOf(".");
+                    int last = files[i].getOriginalFilename().length();
+                    //获得文件后缀名
+                    String a = files[i].getOriginalFilename().substring(begin, last);
+                    if (a.endsWith(".udxcfg")){
+                        break;
                     }
-                    dataList.setFileList(fileList);
-//                }
+                    fileList.add(ogmsPath + "/" + files[i].getOriginalFilename());
+                }
+                dataList.setFileList(fileList);
             }
+        }else {
+            //无配置文件
+            loadFileLog = false;
+            jsonResult.setCode(-1);
+            jsonResult.setMsg("No config file");
+            return jsonResult;
         }
-
         if (loadFileLog == true){
             //信息入库
             dataList.setDate(now);
@@ -179,7 +178,6 @@ public class DataContainerGeneral {
                 dataList.setType(DataTemplateType);
             }
             dataListDao.insert(dataList);
-
             jsonResult.setCode(0);
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("source_store_id",uuid);
@@ -192,60 +190,38 @@ public class DataContainerGeneral {
     @RequestMapping(value = "/data", method = RequestMethod.GET)
     public JsonResult downLoadFile(@RequestParam String uid, HttpServletResponse response){
         boolean downLoadLog = false;
-
         DataList dataList = dataListDao.findFirstByUid(uid);
+        //判断文件个数,单文件不压缩，多文件压缩
         String downLoadPath = dataList.getPath();
-        String fileName = dataList.getUid() + ".zip";
-        File file = new File(downLoadPath + "/" + fileName);
-        if (file.exists()) {
-            response.setContentType("application/force-download");
-            response.addHeader("Content-Disposition", "attachment;fileName=" + fileName);
-            byte[] buffer = new byte[1024];
-            FileInputStream fis = null;
-            BufferedInputStream bis = null;
-            try {
-                fis = new FileInputStream(file);
-                bis = new BufferedInputStream(fis);
-                OutputStream outputStream = response.getOutputStream();
-                int i = bis.read(buffer);
-                while (i != -1) {
-                    outputStream.write(buffer, 0, i);
-                    i = bis.read(buffer);
-                }
-                downLoadLog = true;
-                //return "下载成功";
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                if (bis != null) {
-                    try {
-                        bis.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-                if (fis != null) {
-                    try {
-                        fis.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
+        if (dataList.getFileList().size() == 1){
+            String fileSingle = dataList.getFileList().get(0);
+            File file = new File(fileSingle);
+            String suffix = fileSingle.substring(fileSingle.lastIndexOf(".")+1);
+            String fileName = dataList.getName() + "." + suffix;//下载时的文件名称
+            if (file.exists()){
+                downLoadLog = dataContainer.downLoadFile(response, file, fileName);
+            }
+        }else {
+            String fileZip = dataList.getUid() + ".zip";
+            String fileName = dataList.getName() + ".zip";
+            File file = new File(downLoadPath + "/" + fileZip);
+            if (file.exists()) {
+                downLoadLog = dataContainer.downLoadFile(response,file,fileName);
             }
         }
         JsonResult jsonResult = new JsonResult();
         if (downLoadLog == true){
-            jsonResult.setMsg("download success");;
+            jsonResult.setMsg("download success");
             jsonResult.setCode(0);
         }else {
             jsonResult.setMsg("download fail");
             jsonResult.setCode(-1);
         }
-        return ResultUtils.success(jsonResult);
+        return jsonResult;
     }
 
-    //接口 删除指定上传数据
-    @RequestMapping(value = "del", method = RequestMethod.DELETE)
+    //接口3 删除指定上传数据
+    @RequestMapping(value = "/del", method = RequestMethod.DELETE)
     public JsonResult del(@RequestParam String uid){
         JsonResult jsonResult = new JsonResult();
         boolean delLog = false;
@@ -253,7 +229,7 @@ public class DataContainerGeneral {
         String delPath = dataList.getPath();
 
         //删除文件夹或文件，包括删除文件夹下所有文件
-        delLog = dataContainer.DeleteFolder(delPath);
+        delLog = dataContainer.deleteFolder(delPath);
         if (delLog == true){
             jsonResult.setMsg("delete success");
             jsonResult.setCode(0);
@@ -269,6 +245,7 @@ public class DataContainerGeneral {
         return ResultUtils.success(jsonResult);
     }
 
+    //接口4 批量下载
 
 
 }

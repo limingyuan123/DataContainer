@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import njgis.opengms.datacontainer.entity.DataList;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -72,7 +74,7 @@ public class DataContainer {
                     if (in != null) {
                         in.close();
                     }
-                } catch (IOException e) {
+                }catch (IOException e) {
                     log.error("InputStream or OutputStream close error : {}", e);
                     return false;
                 }
@@ -152,14 +154,53 @@ public class DataContainer {
         return true;
     }
 
+    public boolean downLoadFile(HttpServletResponse response, File file, String fileName){
+        Boolean downLoadLog = false;
+        response.setContentType("application/force-download");
+        response.addHeader("Content-Disposition", "attachment;fileName=" + fileName);
+        byte[] buffer = new byte[1024];
+        FileInputStream fis = null;
+        BufferedInputStream bis = null;
+        try {
+            fis = new FileInputStream(file);
+            bis = new BufferedInputStream(fis);
+            OutputStream outputStream = response.getOutputStream();
+            int i = bis.read(buffer);
+            while (i != -1) {
+                outputStream.write(buffer, 0, i);
+                i = bis.read(buffer);
+            }
+            downLoadLog = true;
+            //return "下载成功";
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (bis != null) {
+                try {
+                    bis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return downLoadLog;
+    }
+
     //根据路径删除指定的目录或文件，无论存在与否
-    public boolean DeleteFolder(String sPath) {
-        boolean flag = false;
+    public boolean deleteFolder(String sPath) {
+        boolean delLog = false;
 
         File file = new File(sPath);
         // 判断目录或文件是否存在
-        if (!file.exists()) {  // 不存在返回 false
-            return flag;
+        if (!file.exists()) {
+            return delLog;
         } else {
             // 判断是否为文件
             if (file.isFile()) {  // 为文件时调用删除文件方法
@@ -172,20 +213,20 @@ public class DataContainer {
 
      //删除单个文件
     public boolean deleteFile(String sPath) {
-        boolean flag;
-        flag = false;
+        boolean delLog;
+        delLog = false;
         File file = new File(sPath);
         // 路径为文件且不为空则进行删除
         if (file.isFile() && file.exists()) {
             file.delete();
-            flag = true;
+            delLog = true;
         }
-        return flag;
+        return delLog;
     }
 
     //删除目录（文件夹）以及目录下的文件
     public boolean deleteDirectory(String sPath) {
-        boolean flag;
+        boolean delLog;
 
         //如果sPath不以文件分隔符结尾，自动添加文件分隔符
         if (!sPath.endsWith(File.separator)) {
@@ -196,21 +237,21 @@ public class DataContainer {
         if (!dirFile.exists() || !dirFile.isDirectory()) {
             return false;
         }
-        flag = true;
+        delLog = true;
         //删除文件夹下的所有文件(包括子目录)
         File[] files = dirFile.listFiles();
         for (int i = 0; i < files.length; i++) {
             //删除子文件
             if (files[i].isFile()) {
-                flag = deleteFile(files[i].getAbsolutePath());
-                if (!flag) break;
+                delLog = deleteFile(files[i].getAbsolutePath());
+                if (!delLog) break;
             } //删除子目录
             else {
-                flag = deleteDirectory(files[i].getAbsolutePath());
-                if (!flag) break;
+                delLog = deleteDirectory(files[i].getAbsolutePath());
+                if (!delLog) break;
             }
         }
-        if (!flag) return false;
+        if (!delLog) return false;
         //删除当前目录
         if (dirFile.delete()) {
             return true;

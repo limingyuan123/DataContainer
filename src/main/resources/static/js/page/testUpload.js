@@ -35,7 +35,7 @@ var testUpload = new Vue({
             $("#uploadFile").click()
         },
         uploadChange(file, fileList) {
-            console.log(fileList)
+            console.log(fileList);
             this.uploadFiles = fileList;
         },
         submitUpload(){
