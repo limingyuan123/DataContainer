@@ -11,6 +11,7 @@ import njgis.opengms.datacontainer.service.DataContainer;
 import njgis.opengms.datacontainer.utils.ResultUtils;
 import njgis.opengms.datacontainer.utils.Utils;
 import org.apache.catalina.servlet4preview.http.HttpServletRequest;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.dom4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,9 +23,12 @@ import org.springframework.web.servlet.ModelAndView;
 
 
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.ws.Response;
 
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @Auther mingyuan
@@ -41,12 +45,8 @@ public class DataContainerGeneral {
 
     @Autowired
     DataListDao dataListDao;
-//    @Value("E:/upload")
-////    @Value("/upload")
-//    private String resourcePath;
 
     @Value("${resourcePath}")
-//    @Value("/data/dataSource/upload_ogms")
     private String resourcePath;
 
     //upload网页
@@ -134,6 +134,22 @@ public class DataContainerGeneral {
                 while((line = br.readLine())!=null){
                     content += line;
                 }
+                //用正则表达式匹配content是否包含xml非法字符  ' " > < &
+                String pattern = ".*&.*";
+                boolean isMatch = Pattern.matches(pattern,content);
+                //如果含有非法字符，则用CDATA包裹
+                if (isMatch){
+                    //匹配头
+                    String pattern1 = "<add";
+                    Pattern p1 = Pattern.compile(pattern1);
+                    Matcher m1 = p1.matcher(content);
+                    content = m1.replaceAll("<![CDATA[<add");
+                    //匹配尾
+                    String pattern2 = "/>";
+                    Pattern p2 = Pattern.compile(pattern2);
+                    Matcher m2 = p2.matcher(content);
+                    content = m2.replaceAll("/>]]>");
+                }
                 Document configXML = DocumentHelper.parseText(content);
                 //获取根元素
                 Element root = configXML.getRootElement();
@@ -189,7 +205,7 @@ public class DataContainerGeneral {
     }
     //接口2 下载数据
     @RequestMapping(value = "/data", method = RequestMethod.GET)
-    public JsonResult downLoadFile(@RequestParam String uid, HttpServletResponse response){
+    public void downLoadFile(@RequestParam String uid, HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         DataList dataList = dataListDao.findFirstByUid(uid);
         //判断文件个数,单文件不压缩，多文件压缩
@@ -218,7 +234,7 @@ public class DataContainerGeneral {
             jsonResult.setMsg("download fail");
             jsonResult.setCode(-1);
         }
-        return jsonResult;
+//        return jsonResult;
     }
 
     //接口3 删除指定上传数据
@@ -247,6 +263,7 @@ public class DataContainerGeneral {
     }
 
     //接口4 批量下载
+
 
 
 }

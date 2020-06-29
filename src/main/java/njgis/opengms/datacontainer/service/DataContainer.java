@@ -154,10 +154,10 @@ public class DataContainer {
         return true;
     }
 
-    public boolean downLoadFile(HttpServletResponse response, File file, String fileName){
+    public boolean downLoadFile(HttpServletResponse response, File file, String fileName) throws UnsupportedEncodingException {
         Boolean downLoadLog = false;
         response.setContentType("application/force-download");
-        response.addHeader("Content-Disposition", "attachment;fileName=" + fileName);
+        response.addHeader("Content-Disposition", "attachment;fileName=" + new String(fileName.getBytes("utf-8"),"ISO8859-1"));
         byte[] buffer = new byte[1024];
         FileInputStream fis = null;
         BufferedInputStream bis = null;

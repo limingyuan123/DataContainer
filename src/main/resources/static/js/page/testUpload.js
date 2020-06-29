@@ -4,7 +4,7 @@ var testUpload = new Vue({
         return{
             image:'',
             uploadFiles: [],
-            upLoadName:"testData",
+            upLoadName:"test特殊符号",
             userId:"65",
             serverNode:"china",
             origination:"portal",
