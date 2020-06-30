@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -97,7 +98,7 @@ public class DataContainer {
 
     public boolean uploadOGMSMulti(String ogmsPath, String uuid, MultipartFile[] files){
         BufferedInputStream bis = null;
-        FileOutputStream fos = null;
+//        FileOutputStream fos = null;
         ZipOutputStream zos = null;
         InputStream inputStream = null;
         DataList dataList = new DataList();
@@ -117,14 +118,18 @@ public class DataContainer {
 
             //如果为多个，则将上传的文件进行压缩，之后进行上传，配置文件不压缩
             for (int i = 0; i < files.length; i++) {
-                //对文文件的全名进行截取然后在后缀名进行删选。
-                int begin = files[i].getOriginalFilename().indexOf(".");
-                int last = files[i].getOriginalFilename().length();
-                //获得文件后缀名
-                String a = files[i].getOriginalFilename().substring(begin, last);
-                //如文件为配置文件，则不压缩
-                if (a.endsWith(".udxcfg")){
-                    break;
+                //有些上传文件无后缀，筛选无后缀文件
+                boolean isMatchSuffix = files[i].getOriginalFilename().contains(".");
+                if (isMatchSuffix == true){
+                    //对文文件的全名进行截取然后在后缀名进行删选。
+                    int begin = files[i].getOriginalFilename().indexOf(".");
+                    int last = files[i].getOriginalFilename().length();
+                    //获得文件后缀名
+                    String a = files[i].getOriginalFilename().substring(begin, last);
+                    //如文件为配置文件，则不压缩
+                    if (a.endsWith(".udxcfg")){
+                        break;
+                    }
                 }
 
                 inputStream = files[i].getInputStream();
@@ -156,6 +161,9 @@ public class DataContainer {
                     bis.close();
                 if (null != zos)
                     zos.close();
+                if (inputStream!=null){
+                    inputStream.close();
+                }
 
             } catch (IOException e) {
                 log.error("InputStream or OutputStream close error : {}", e);

@@ -152,12 +152,17 @@ public class DataContainerGeneral {
                 for (int i=0;i<files.length;i++){
                     //fileList字段也不加入配置文件
                     //对文文件的全名进行截取然后在后缀名进行删选。
-                    int begin = files[i].getOriginalFilename().indexOf(".");
-                    int last = files[i].getOriginalFilename().length();
-                    //获得文件后缀名
-                    String a = files[i].getOriginalFilename().substring(begin, last);
-                    if (a.endsWith(".udxcfg")){
-                        break;
+
+                    //有些上传文件无后缀，筛选无后缀文件
+                    boolean isMatchSuffix = files[i].getOriginalFilename().contains(".");
+                    if (isMatchSuffix == true) {
+                        int begin = files[i].getOriginalFilename().indexOf(".");
+                        int last = files[i].getOriginalFilename().length();
+                        //获得文件后缀名
+                        String a = files[i].getOriginalFilename().substring(begin, last);
+                        if (a.endsWith(".udxcfg")) {
+                            break;
+                        }
                     }
                     fileList.add(ogmsPath + "/" + files[i].getOriginalFilename());
                 }
