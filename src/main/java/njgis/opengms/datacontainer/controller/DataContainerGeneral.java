@@ -8,23 +8,14 @@ import njgis.opengms.datacontainer.dao.ImageDao;
 import njgis.opengms.datacontainer.entity.DataList;
 import njgis.opengms.datacontainer.entity.Image;
 import njgis.opengms.datacontainer.service.DataContainer;
-import njgis.opengms.datacontainer.utils.ResultUtils;
 import njgis.opengms.datacontainer.utils.Utils;
-import org.apache.catalina.servlet4preview.http.HttpServletRequest;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.dom4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
-
-
 import javax.servlet.http.HttpServletResponse;
-import javax.xml.ws.Response;
-
 import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -207,25 +198,8 @@ public class DataContainerGeneral {
     @RequestMapping(value = "/data", method = RequestMethod.GET)
     public void downLoadFile(@RequestParam String uid, HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
-        DataList dataList = dataListDao.findFirstByUid(uid);
-        //判断文件个数,单文件不压缩，多文件压缩
-        String downLoadPath = dataList.getPath();
-        if (dataList.getFileList().size() == 1){
-            String fileSingle = dataList.getFileList().get(0);
-            File file = new File(fileSingle);
-            String suffix = fileSingle.substring(fileSingle.lastIndexOf(".")+1);
-            String fileName = dataList.getName() + "." + suffix;//下载时的文件名称
-            if (file.exists()){
-                downLoadLog = dataContainer.downLoadFile(response, file, fileName);
-            }
-        }else {
-            String fileZip = dataList.getUid() + ".zip";
-            String fileName = dataList.getName() + ".zip";
-            File file = new File(downLoadPath + "/" + fileZip);
-            if (file.exists()) {
-                downLoadLog = dataContainer.downLoadFile(response,file,fileName);
-            }
-        }
+        downLoadLog = dataContainer.downLoad(uid,response);
+
         JsonResult jsonResult = new JsonResult();
         if (downLoadLog == true){
             jsonResult.setMsg("download success");
@@ -263,7 +237,44 @@ public class DataContainerGeneral {
     }
 
     //接口4 批量下载
+    @RequestMapping(value = "/BulkDownLoad",method = RequestMethod.GET)
+    public void BulkDownLoad(@RequestBody List<String> uids, HttpServletResponse response) throws UnsupportedEncodingException {
+        Boolean downLoadLog = false;
+        Boolean delCacheFile = false;
+        File[] files = new File[uids.size()];
+        for (int i=0;i<uids.size();i++){
+            DataList dataList = dataListDao.findFirstByUid(uids.get(i));
+            String downLoadPath = dataList.getPath();
+            if (dataList.getFileList().size() == 1){
+                String fileSingle = dataList.getFileList().get(0);
+                File file = new File(fileSingle);
+                files[i] = file;
+            }else {
+                String fileZip = dataList.getUid() + ".zip";
+                File file = new File(downLoadPath + "/" + fileZip);
+                files[i] = file;
+            }
+        }
+        JsonResult jsonResult = new JsonResult();
+        jsonResult = dataContainer.downLoadBulkFile(response,files);
+        if (jsonResult.getCode() == 0){
+            //如果下载成功，则将打包存储在服务器的文件删除
+            delCacheFile = dataContainer.deleteFolder(jsonResult.getData().toString());
+            if (delCacheFile == false){
+                jsonResult.setCode(0);
+                jsonResult.setMsg("downLoad success but delete cache file fail");
+            }else {
+                jsonResult.setCode(0);
+                jsonResult.setMsg("downLoad success");
+            }
+        }else {
+            jsonResult.setMsg("downLoad failed");
+            jsonResult.setCode(-1);
+        }
+        return;
+    }
 
+    //无需配置文件上传接口
 
 
 }
