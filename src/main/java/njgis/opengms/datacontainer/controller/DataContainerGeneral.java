@@ -242,8 +242,8 @@ public class DataContainerGeneral {
     }
 
     //接口4 批量下载
-    @RequestMapping(value = "/BulkDownLoad",method = RequestMethod.GET)
-    public void BulkDownLoad(@RequestBody List<String> uids, HttpServletResponse response) throws UnsupportedEncodingException {
+    @RequestMapping(value = "/bulkDownLoad",method = RequestMethod.GET)
+    public void bulkDownLoad(@RequestParam(value = "uids") List<String> uids, HttpServletResponse response) throws UnsupportedEncodingException {
         Boolean downLoadLog = false;
         Boolean delCacheFile = false;
         File[] files = new File[uids.size()];
@@ -279,7 +279,88 @@ public class DataContainerGeneral {
         return;
     }
 
+    //批量删除
+    @RequestMapping(value = "bulkDel",method = RequestMethod.DELETE)
+    public JsonResult bulkDel(@RequestParam(value = "uids") List<String> uids,HttpServletResponse response){
+        JsonResult jsonResult = new JsonResult();
+        boolean delLog = false;
+        for (int i=0;i<uids.size();i++) {
+            DataList dataList = dataListDao.findFirstByUid(uids.get(i));
+            String delPath = dataList.getPath();
+
+            //删除文件夹或文件，包括删除文件夹下所有文件
+            delLog = dataContainer.deleteFolder(delPath);
+            if (delLog == true) {
+                //删除对应的数据库内容
+                if (dataList != null) {
+                    dataListDao.delete(dataList);
+                }
+            } else {
+                String failName = dataList.getName();
+                jsonResult.setCode(-1);
+                jsonResult.setMsg(failName + "delete fail");
+                return jsonResult;
+            }
+        }
+        if (delLog == true){
+            jsonResult.setCode(0);
+            jsonResult.setMsg("All fail delete success");
+        }
+        return jsonResult;
+    }
+
     //无需配置文件上传接口
+    @RequestMapping(value = "/dataNoneConfig", method = RequestMethod.POST)
+    public JsonResult dataNoneConfig(@RequestParam("ogmsdata")MultipartFile[] files,
+                                 @RequestParam("name")String uploadName,
+                                 @RequestParam("userId")String userName,
+                                 @RequestParam("serverNode")String serverNode,
+                                 @RequestParam("origination")String origination){
+        JsonResult jsonResult = new JsonResult();
+        boolean loadFileLog = false;
+        Date now = new Date();
+        DataList dataList = new DataList();
+        String uuid = UUID.randomUUID().toString();
+        List<String> fileList = new ArrayList<>();
+        //参数检验
+        if (uploadName==""||userName==""||serverNode==""||origination==""){
+            jsonResult.setCode(-1);
+            jsonResult.setMsg("without name or userId or origination or serverNode");
+            return jsonResult;
+        }
+        String ogmsPath;
+        ogmsPath = resourcePath + "/" + uuid;
+        //文件检验
+        if (files.length==0){
+            loadFileLog = false;
+        }else{
+            loadFileLog = dataContainer.uploadOGMSMulti(ogmsPath,uuid,files);
+            for (int i=0;i<files.length;i++){
+                fileList.add(ogmsPath + "/" + files[i].getOriginalFilename());
+            }
+            dataList.setFileList(fileList);
+        }
+        if (loadFileLog == true){
+            //信息入库
+            dataList.setConfigFile(false);
+            dataList.setDate(now);
+            dataList.setName(uploadName);
+            dataList.setOrigination(origination);
+            dataList.setServerNode(serverNode);
+            dataList.setPath(ogmsPath);
+            dataList.setUserId(userName);
+            dataList.setUid(uuid);
+            dataListDao.insert(dataList);
+            jsonResult.setCode(0);
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("source_store_id",uuid);
+            jsonObject.put("file_name",uploadName);
+            jsonResult.setData(jsonObject);
+        }
+        return jsonResult;
+    }
+
+    //断点续传接口
 
 
 }

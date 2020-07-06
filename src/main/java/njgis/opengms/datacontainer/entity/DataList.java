@@ -27,4 +27,5 @@ public class DataList {
     String type;
     String singleFileName;
     String dataTemplateId;
+    Boolean configFile;
 }
