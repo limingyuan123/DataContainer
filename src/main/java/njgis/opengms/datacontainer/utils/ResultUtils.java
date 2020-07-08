@@ -4,8 +4,8 @@ import njgis.opengms.datacontainer.bean.JsonResult;
 import njgis.opengms.datacontainer.enums.ResultEnum;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.15 17:03
+ * @Author mingyuan
+ * @Date 2020.06.15 17:03
  */
 public class ResultUtils {
     public static JsonResult success() {

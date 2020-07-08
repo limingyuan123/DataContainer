@@ -1,8 +1,8 @@
 package njgis.opengms.datacontainer.utils;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.12 10:25
+ * @Author mingyuan
+ * @Date 2020.06.12 10:25
  */
 
 

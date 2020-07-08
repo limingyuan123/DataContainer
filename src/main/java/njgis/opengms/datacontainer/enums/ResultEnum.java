@@ -1,8 +1,8 @@
 package njgis.opengms.datacontainer.enums;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.15 17:05
+ * @Author mingyuan
+ * @Date 2020.06.15 17:05
  */
 public enum ResultEnum {
     SUCCESS(0, "成功"),

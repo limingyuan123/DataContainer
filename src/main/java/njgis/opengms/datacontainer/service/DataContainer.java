@@ -18,8 +18,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.13 16:48
+ * @Author mingyuan
+ * @Date 2020.06.13 16:48
  */
 @Service
 @Slf4j

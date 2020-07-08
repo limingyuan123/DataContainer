@@ -4,8 +4,8 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.28 11:19
+ * @Author mingyuan
+ * @Date 2020.06.28 11:19
  */
 public class ServletInitializer extends SpringBootServletInitializer {
     @Override

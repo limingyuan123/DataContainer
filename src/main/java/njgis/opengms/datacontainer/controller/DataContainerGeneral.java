@@ -22,8 +22,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.11 15:46
+ * @Author mingyuan
+ * @Date 2020.06.11 15:46
  */
 @RestController
 @Slf4j
@@ -88,7 +88,7 @@ public class DataContainerGeneral {
         String dataTemplateId = "";
         String DataTemplateType = "";
         //参数检验
-        if (uploadName==""||userName==""||serverNode==""||origination==""){
+        if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
             jsonResult.setCode(-1);
             jsonResult.setMsg("without name or userId or origination or serverNode");
             return jsonResult;

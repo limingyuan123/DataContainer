@@ -8,8 +8,8 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.11 15:54
+ * @Author mingyuan
+ * @Date 2020.06.11 15:54
  */
 @Data
 @AllArgsConstructor

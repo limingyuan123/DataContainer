@@ -5,8 +5,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 
 /**
- * @Auther mingyuan
- * @Data 2020.06.16 9:22
+ * @Author mingyuan
+ * @Date 2020.06.16 9:22
  */
 public class MultipartFileConversionFile {
     public static MultipartFile FileToMultipartFile(File file){
