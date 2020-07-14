@@ -24,6 +24,7 @@ public class BulkDataLink {
     Date date;
     String type;
     String dataTemplate;//id去掉
+    String path;
     Boolean configFile;
     Boolean Cache;//超过七天无下载则直接删除该数据（不是表），再下载则根据表找到数据列表进行打包
 }

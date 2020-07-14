@@ -3,9 +3,12 @@ package njgis.opengms.datacontainer.controller;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import njgis.opengms.datacontainer.bean.JsonResult;
+import njgis.opengms.datacontainer.dao.BulkDataLinkDao;
+import njgis.opengms.datacontainer.dao.DataListComDao;
 import njgis.opengms.datacontainer.dao.DataListDao;
 import njgis.opengms.datacontainer.dao.ImageDao;
-import njgis.opengms.datacontainer.entity.DataList;
+import njgis.opengms.datacontainer.entity.BulkDataLink;
+import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.Image;
 import njgis.opengms.datacontainer.service.DataContainer;
 import njgis.opengms.datacontainer.utils.Utils;
@@ -16,7 +19,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.bind.ValidationEventLocator;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,7 +32,7 @@ import java.util.regex.Pattern;
  */
 @RestController
 @Slf4j
-public class DataContainerGeneral {
+public class DataContainerController {
     @Autowired
     ImageDao imageDao;
 
@@ -36,6 +41,12 @@ public class DataContainerGeneral {
 
     @Autowired
     DataListDao dataListDao;
+
+    @Autowired
+    DataListComDao dataListComDao;
+
+    @Autowired
+    BulkDataLinkDao bulkDataLinkDao;
 
     @Value("${resourcePath}")
     private String resourcePath;
@@ -72,19 +83,19 @@ public class DataContainerGeneral {
         return jsonResult;
     }
 
-    //接口1 批量上传ogms数据  含配置文件类
+    //接口1改进 批量上传ogms数据并分开存储  含配置文件类
     @RequestMapping(value = "/data", method = RequestMethod.POST)
-    public JsonResult uploadFile(@RequestParam("ogmsdata")MultipartFile[] files,
+    public JsonResult uploadData(@RequestParam("ogmsdata")MultipartFile[] files,
                                  @RequestParam("name")String uploadName,
                                  @RequestParam("userId")String userName,
                                  @RequestParam("serverNode")String serverNode,
                                  @RequestParam("origination")String origination) throws IOException, DocumentException {
         JsonResult jsonResult = new JsonResult();
         boolean loadFileLog = false;
+        boolean configExist = true;
         Date now = new Date();
-        DataList dataList = new DataList();
+        BulkDataLink bulkDataLink = new BulkDataLink();
         String uuid = UUID.randomUUID().toString();
-        List<String> fileList = new ArrayList<>();
         String dataTemplateId = "";
         String DataTemplateType = "";
         //参数检验
@@ -113,84 +124,62 @@ public class DataContainerGeneral {
                 jsonResult.setMsg("No config file");
                 return jsonResult;
             }
-        }else if (files.length>1){
+        }else {
             //有多个文件，且含有配置文件
-            if (files[files.length-1].getOriginalFilename().equals("config.udxcfg")){
+            if (Objects.equals(files[files.length - 1].getOriginalFilename(), "config.udxcfg")){
                 //检查配置文件格式 ,通过String转xml，逐行读取配置文件内容
                 Reader reader = null;
-                reader = new InputStreamReader(files[files.length-1].getInputStream(),"utf-8");
+                reader = new InputStreamReader(files[files.length-1].getInputStream(), StandardCharsets.UTF_8);
                 BufferedReader br = new BufferedReader(reader);
                 String line;
-                String content = "";
+                StringBuilder content = new StringBuilder();
                 while((line = br.readLine())!=null){
-                    content += line;
+                    content.append(line);
                 }
                 //用正则表达式匹配content是否包含xml非法字符  ' " > < &
                 String pattern = ".*&.*";
-                boolean isMatch = Pattern.matches(pattern,content);
+                boolean isMatch = Pattern.matches(pattern, content.toString());
                 //如果含有非法字符，则用CDATA包裹
                 if (isMatch){
                     //匹配头
                     String pattern1 = "<add";
                     Pattern p1 = Pattern.compile(pattern1);
-                    Matcher m1 = p1.matcher(content);
-                    content = m1.replaceAll("<![CDATA[<add");
+                    Matcher m1 = p1.matcher(content.toString());
+                    content = new StringBuilder(m1.replaceAll("<![CDATA[<add"));
                     //匹配尾
                     String pattern2 = "/>";
                     Pattern p2 = Pattern.compile(pattern2);
-                    Matcher m2 = p2.matcher(content);
-                    content = m2.replaceAll("/>]]>");
+                    Matcher m2 = p2.matcher(content.toString());
+                    content = new StringBuilder(m2.replaceAll("/>]]>"));
                 }
-                Document configXML = DocumentHelper.parseText(content);
+                Document configXML = DocumentHelper.parseText(content.toString());
                 //获取根元素
                 Element root = configXML.getRootElement();
                 //获取根元素下所有的子元素
                 dataTemplateId = root.element("DataTemplate").getText();
                 DataTemplateType = root.element("DataTemplate").attribute("type").getText();
                 //首先判断文件个数,一个文件也压缩上传
-                loadFileLog = dataContainer.uploadOGMSMulti(ogmsPath,uuid,files);
-                for (int i=0;i<files.length;i++){
-                    //fileList字段也不加入配置文件
-                    //对文文件的全名进行截取然后在后缀名进行删选。
-
-                    //有些上传文件无后缀，筛选无后缀文件
-                    boolean isMatchSuffix = files[i].getOriginalFilename().contains(".");
-                    if (isMatchSuffix == true) {
-                        int begin = files[i].getOriginalFilename().indexOf(".");
-                        int last = files[i].getOriginalFilename().length();
-                        //获得文件后缀名
-                        String a = files[i].getOriginalFilename().substring(begin, last);
-                        if (a.endsWith(".udxcfg")) {
-                            break;
-                        }
-                    }
-                    fileList.add(ogmsPath + "/" + files[i].getOriginalFilename());
-                }
-                dataList.setFileList(fileList);
+                loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist);
             }
-        }else {
-            //无配置文件
-            loadFileLog = false;
-            jsonResult.setCode(-1);
-            jsonResult.setMsg("No config file");
-            return jsonResult;
         }
-        if (loadFileLog == true){
+        if (loadFileLog){
             //信息入库
-            dataList.setDate(now);
-            dataList.setName(uploadName);
-            dataList.setOrigination(origination);
-            dataList.setServerNode(serverNode);
-            dataList.setPath(ogmsPath);
-            dataList.setUserId(userName);
-            dataList.setUid(uuid);
-            if (DataTemplateType.equals("id")) {
-                dataList.setDataTemplateId(dataTemplateId);
-                dataList.setType("template");
+            bulkDataLink.setDate(now);
+            bulkDataLink.setName(uploadName);
+            bulkDataLink.setOrigination(origination);
+            bulkDataLink.setServerNode(serverNode);
+            bulkDataLink.setUid(userName);
+            bulkDataLink.setZipOid(uuid);
+            bulkDataLink.setPath(ogmsPath);
+            bulkDataLink.setConfigFile(true);
+            if (DataTemplateType.equals("id")){
+                bulkDataLink.setDataTemplate(dataTemplateId);
+                bulkDataLink.setType("template");
             }else {
-                dataList.setType(DataTemplateType);
+                bulkDataLink.setType(DataTemplateType);
             }
-            dataListDao.insert(dataList);
+            bulkDataLinkDao.save(bulkDataLink);
+
             jsonResult.setCode(0);
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("source_store_id",uuid);
@@ -199,14 +188,14 @@ public class DataContainerGeneral {
         }
         return jsonResult;
     }
+
     //接口2 下载数据
     @RequestMapping(value = "/data", method = RequestMethod.GET)
-    public void downLoadFile(@RequestParam String uid, HttpServletResponse response) throws UnsupportedEncodingException {
+    public void downLoadFile(@RequestParam String oid, HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
-        downLoadLog = dataContainer.downLoad(uid,response);
-
+        downLoadLog = dataContainer.downLoad(oid,response);
         JsonResult jsonResult = new JsonResult();
-        if (downLoadLog == true){
+        if (downLoadLog){
             jsonResult.setMsg("download success");
             jsonResult.setCode(0);
         }else {
@@ -218,46 +207,55 @@ public class DataContainerGeneral {
 
     //接口3 删除指定上传数据
     @RequestMapping(value = "/del", method = RequestMethod.DELETE)
-    public JsonResult del(@RequestParam String uid){
+    public JsonResult del(@RequestParam(value = "oid") String oid){
         JsonResult jsonResult = new JsonResult();
         boolean delLog = false;
-        DataList dataList = dataListDao.findFirstByUid(uid);
-        String delPath = dataList.getPath();
 
-        //删除文件夹或文件，包括删除文件夹下所有文件
-        delLog = dataContainer.deleteFolder(delPath);
-        if (delLog == true){
+        BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
+        delLog = dataContainer.delete(oid);
+        if (delLog){
             jsonResult.setMsg("delete success");
             jsonResult.setCode(0);
-            //删除对应的数据库内容
-            if (dataList!=null) {
-                dataListDao.delete(dataList);
-            }
         }else {
             jsonResult.setCode(-1);
             jsonResult.setMsg("delete fail");
         }
-
         return jsonResult;
     }
 
     //接口4 批量下载
     @RequestMapping(value = "/bulkDownLoad",method = RequestMethod.GET)
-    public void bulkDownLoad(@RequestParam(value = "uids") List<String> uids, HttpServletResponse response) throws UnsupportedEncodingException {
-        Boolean downLoadLog = false;
-        Boolean delCacheFile = false;
-        File[] files = new File[uids.size()];
-        for (int i=0;i<uids.size();i++){
-            DataList dataList = dataListDao.findFirstByUid(uids.get(i));
-            String downLoadPath = dataList.getPath();
-            if (dataList.getFileList().size() == 1){
-                String fileSingle = dataList.getFileList().get(0);
-                File file = new File(fileSingle);
-                files[i] = file;
+    public void bulkDownLoad(@RequestParam(value = "oids") List<String> oids, HttpServletResponse response) throws UnsupportedEncodingException {
+        boolean downLoadLog = false;
+        boolean delCacheFile = false;
+        File[] files = new File[oids.size()];
+        for (int i=0;i<oids.size();i++){
+//            DataList dataList = dataListDao.findFirstByUid(oids.get(i));
+            BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oids.get(i));
+            if (bulkDataLink == null){
+                //两种情况，一种情况是oid输入错误，另一种情况是输入的是dataListCom的oid
+                DataListCom dataListCom = dataListComDao.findFirstByOid(oids.get(i));
+                if (dataListCom == null){
+                    downLoadLog = false;
+                    return;
+                }else {
+                    //下载单文件
+                    String fileSingle = dataListCom.getPath() + "/"+dataListCom.getFileName();
+                    File file = new File(fileSingle);
+                    files[i] = file;
+                }
             }else {
-                String fileZip = dataList.getUid() + ".zip";
-                File file = new File(downLoadPath + "/" + fileZip);
-                files[i] = file;
+                String downLoadPath = bulkDataLink.getPath();
+                if (bulkDataLink.getDataOids().size() == 1) {
+                    DataListCom dataListCom = dataListComDao.findFirstByOid(bulkDataLink.getDataOids().get(0));
+                    String fileSingle = dataListCom.getPath() + "/" + dataListCom.getFileName();
+                    File file = new File(fileSingle);
+                    files[i] = file;
+                } else {
+                    String fileZip = bulkDataLink.getZipOid() + ".zip";
+                    File file = new File(downLoadPath + "/" + fileZip);
+                    files[i] = file;
+                }
             }
         }
         JsonResult jsonResult = new JsonResult();
@@ -265,7 +263,7 @@ public class DataContainerGeneral {
         if (jsonResult.getCode() == 0){
             //如果下载成功，则将打包存储在服务器的文件删除
             delCacheFile = dataContainer.deleteFolder(jsonResult.getData().toString());
-            if (delCacheFile == false){
+            if (!delCacheFile){
                 jsonResult.setCode(0);
                 jsonResult.setMsg("downLoad success but delete cache file fail");
             }else {
@@ -279,51 +277,43 @@ public class DataContainerGeneral {
         return;
     }
 
-    //批量删除
+    //接口5 批量删除
     @RequestMapping(value = "bulkDel",method = RequestMethod.DELETE)
-    public JsonResult bulkDel(@RequestParam(value = "uids") List<String> uids,HttpServletResponse response){
+    public JsonResult bulkDel(@RequestParam(value = "oids") List<String> oids){
         JsonResult jsonResult = new JsonResult();
         boolean delLog = false;
-        for (int i=0;i<uids.size();i++) {
-            DataList dataList = dataListDao.findFirstByUid(uids.get(i));
-            String delPath = dataList.getPath();
-
-            //删除文件夹或文件，包括删除文件夹下所有文件
-            delLog = dataContainer.deleteFolder(delPath);
-            if (delLog == true) {
-                //删除对应的数据库内容
-                if (dataList != null) {
-                    dataListDao.delete(dataList);
-                }
-            } else {
-                String failName = dataList.getName();
+        for (int i=0;i<oids.size();i++) {
+            delLog = dataContainer.delete(oids.get(i));
+            if (!delLog) {
+                BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oids.get(i));
+                String failName = bulkDataLink.getName();
                 jsonResult.setCode(-1);
                 jsonResult.setMsg(failName + "delete fail");
                 return jsonResult;
             }
         }
-        if (delLog == true){
+        if (delLog){
             jsonResult.setCode(0);
             jsonResult.setMsg("All fail delete success");
         }
         return jsonResult;
     }
 
-    //无需配置文件上传接口
+    //接口6 无需配置文件上传接口
     @RequestMapping(value = "/dataNoneConfig", method = RequestMethod.POST)
     public JsonResult dataNoneConfig(@RequestParam("ogmsdata")MultipartFile[] files,
                                  @RequestParam("name")String uploadName,
                                  @RequestParam("userId")String userName,
                                  @RequestParam("serverNode")String serverNode,
-                                 @RequestParam("origination")String origination){
+                                 @RequestParam("origination")String origination) throws IOException {
         JsonResult jsonResult = new JsonResult();
         boolean loadFileLog = false;
+        boolean configExist = false;
         Date now = new Date();
-        DataList dataList = new DataList();
+        BulkDataLink bulkDataLink = new BulkDataLink();
         String uuid = UUID.randomUUID().toString();
-        List<String> fileList = new ArrayList<>();
         //参数检验
-        if (uploadName==""||userName==""||serverNode==""||origination==""){
+        if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
             jsonResult.setCode(-1);
             jsonResult.setMsg("without name or userId or origination or serverNode");
             return jsonResult;
@@ -334,23 +324,20 @@ public class DataContainerGeneral {
         if (files.length==0){
             loadFileLog = false;
         }else{
-            loadFileLog = dataContainer.uploadOGMSMulti(ogmsPath,uuid,files);
-            for (int i=0;i<files.length;i++){
-                fileList.add(ogmsPath + "/" + files[i].getOriginalFilename());
-            }
-            dataList.setFileList(fileList);
+            loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist);
         }
-        if (loadFileLog == true){
+        if (loadFileLog){
             //信息入库
-            dataList.setConfigFile(false);
-            dataList.setDate(now);
-            dataList.setName(uploadName);
-            dataList.setOrigination(origination);
-            dataList.setServerNode(serverNode);
-            dataList.setPath(ogmsPath);
-            dataList.setUserId(userName);
-            dataList.setUid(uuid);
-            dataListDao.insert(dataList);
+            bulkDataLink.setDate(now);
+            bulkDataLink.setName(uploadName);
+            bulkDataLink.setOrigination(origination);
+            bulkDataLink.setServerNode(serverNode);
+            bulkDataLink.setUid(userName);
+            bulkDataLink.setZipOid(uuid);
+            bulkDataLink.setPath(ogmsPath);
+            bulkDataLink.setConfigFile(false);
+            bulkDataLinkDao.save(bulkDataLink);
+
             jsonResult.setCode(0);
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("source_store_id",uuid);
@@ -360,7 +347,14 @@ public class DataContainerGeneral {
         return jsonResult;
     }
 
-    //断点续传接口
+    //断点续传接口Breakpoint continuation
+    @RequestMapping(value = "dataBPContinue", method = RequestMethod.GET)
+    public void dataBPContinue(@RequestParam String oid,HttpServletResponse response){
+
+    }
+
+
+    //以本名上传
 
 
 }

@@ -2,6 +2,8 @@ package njgis.opengms.datacontainer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * @Author mingyuan
@@ -9,6 +11,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  */
 
 @SpringBootApplication
+@EnableScheduling
+@EnableAsync
 public class DataContainerApplication {
 
     public static void main(String[] args) {
