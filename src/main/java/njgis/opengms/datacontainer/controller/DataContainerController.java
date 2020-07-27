@@ -3,13 +3,11 @@ package njgis.opengms.datacontainer.controller;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import njgis.opengms.datacontainer.bean.JsonResult;
-import njgis.opengms.datacontainer.dao.BulkDataLinkDao;
-import njgis.opengms.datacontainer.dao.DataListComDao;
-import njgis.opengms.datacontainer.dao.DataListDao;
-import njgis.opengms.datacontainer.dao.ImageDao;
+import njgis.opengms.datacontainer.dao.*;
 import njgis.opengms.datacontainer.entity.BulkDataLink;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.Image;
+import njgis.opengms.datacontainer.entity.VisualCategory;
 import njgis.opengms.datacontainer.service.DataContainer;
 import njgis.opengms.datacontainer.utils.Utils;
 import org.dom4j.*;
@@ -18,6 +16,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
+import sun.security.krb5.internal.PAData;
+
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.ValidationEventLocator;
 import java.io.*;
@@ -48,8 +48,14 @@ public class DataContainerController {
     @Autowired
     BulkDataLinkDao bulkDataLinkDao;
 
+    @Autowired
+    VisualCategoryDao visualCategoryDao;
+
     @Value("${resourcePath}")
     private String resourcePath;
+
+    @Value("${visualPath}")
+    private String visualPath;
 
     //upload网页
     @RequestMapping("/testUpload")
@@ -97,6 +103,7 @@ public class DataContainerController {
         BulkDataLink bulkDataLink = new BulkDataLink();
         String uuid = UUID.randomUUID().toString();
         String dataTemplateId = "";
+        String dataTemplate = "";
         String DataTemplateType = "";
         //参数检验
         if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
@@ -125,41 +132,82 @@ public class DataContainerController {
                 return jsonResult;
             }
         }else {
-            //有多个文件，且含有配置文件
-            if (Objects.equals(files[files.length - 1].getOriginalFilename(), "config.udxcfg")){
-                //检查配置文件格式 ,通过String转xml，逐行读取配置文件内容
-                Reader reader = null;
-                reader = new InputStreamReader(files[files.length-1].getInputStream(), StandardCharsets.UTF_8);
-                BufferedReader br = new BufferedReader(reader);
-                String line;
-                StringBuilder content = new StringBuilder();
-                while((line = br.readLine())!=null){
-                    content.append(line);
+            boolean config = false;
+            for (MultipartFile file:files){
+                //有多个文件，且含有配置文件
+                if (Objects.equals(file.getOriginalFilename(), "config.udxcfg")){
+                    config = true;
+                    //检查配置文件格式 ,通过String转xml，逐行读取配置文件内容
+                    Reader reader = null;
+                    reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+                    BufferedReader br = new BufferedReader(reader);
+                    String line;
+                    StringBuilder content = new StringBuilder();
+                    while((line = br.readLine())!=null){
+                        content.append(line);
+                    }
+                    //去除string中的空格\t、回车\n、换行符\r、制表符\t
+                    String dest = new String(content);
+                    dest = dest.replaceAll("\t","");
+                    content = new StringBuilder(dest);
+
+                    //用正则表达式匹配content是否包含xml非法字符  ' " > < &
+                    String pattern = ".*&.*";
+                    boolean isMatch = Pattern.matches(pattern, content.toString());
+                    //如果含有非法字符，则用CDATA包裹
+                    if (isMatch){
+                        //匹配头
+                        String pattern1 = "<add";
+                        Pattern p1 = Pattern.compile(pattern1);
+                        Matcher m1 = p1.matcher(content.toString());
+                        content = new StringBuilder(m1.replaceAll("<![CDATA[<add"));
+                        //匹配尾
+                        String pattern2 = "/>";
+                        Pattern p2 = Pattern.compile(pattern2);
+                        Matcher m2 = p2.matcher(content.toString());
+                        content = new StringBuilder(m2.replaceAll("/>]]>"));
+                    }
+                    Document configXML = DocumentHelper.parseText(content.toString());
+                    //获取根元素
+                    Element root = configXML.getRootElement();
+                    //判断DataTemplate里包含的是id还是schema
+                    DataTemplateType = root.element("DataTemplate").attribute("type").getText();
+                    if (DataTemplateType.equals("id")){
+                        dataTemplateId = root.element("DataTemplate").getText();
+                    }else if (DataTemplateType.equals("schema")){
+                        //利用正则表达式截取DataTemplate下的schema数据
+                        String xml = new String(content);
+                        String tag = "UdxDeclaration";
+                        String rgex = "<"+tag+">(.*?)</"+tag+">";
+                        Pattern p = Pattern.compile(rgex);
+                        Matcher m = p.matcher(xml);
+                        String context = "";
+                        List<String> list = new ArrayList<String>();
+                        while (m.find()) {
+                            int i = 1;
+                            list.add(m.group(i));
+                            i++;
+                        }
+                        //只要匹配的第一个
+                        if(list.size()>0){
+                            context = list.get(0);
+                        }
+                        log.info(context);
+                        context = "<UdxDeclaration>" + context + "</UdxDeclaration>";
+                        log.info(context);
+                        dataTemplate = context;
+                        log.info(dataTemplate);
+                    }
+                    //首先判断文件个数,一个文件也压缩上传
+                    loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist);
+                    break;
                 }
-                //用正则表达式匹配content是否包含xml非法字符  ' " > < &
-                String pattern = ".*&.*";
-                boolean isMatch = Pattern.matches(pattern, content.toString());
-                //如果含有非法字符，则用CDATA包裹
-                if (isMatch){
-                    //匹配头
-                    String pattern1 = "<add";
-                    Pattern p1 = Pattern.compile(pattern1);
-                    Matcher m1 = p1.matcher(content.toString());
-                    content = new StringBuilder(m1.replaceAll("<![CDATA[<add"));
-                    //匹配尾
-                    String pattern2 = "/>";
-                    Pattern p2 = Pattern.compile(pattern2);
-                    Matcher m2 = p2.matcher(content.toString());
-                    content = new StringBuilder(m2.replaceAll("/>]]>"));
-                }
-                Document configXML = DocumentHelper.parseText(content.toString());
-                //获取根元素
-                Element root = configXML.getRootElement();
-                //获取根元素下所有的子元素
-                dataTemplateId = root.element("DataTemplate").getText();
-                DataTemplateType = root.element("DataTemplate").attribute("type").getText();
-                //首先判断文件个数,一个文件也压缩上传
-                loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist);
+            }
+            if (!config){
+                //有多个文件，但不含有配置文件
+                jsonResult.setCode(-1);
+                jsonResult.setMsg("No config file");
+                return jsonResult;
             }
         }
         if (loadFileLog){
@@ -173,8 +221,11 @@ public class DataContainerController {
             bulkDataLink.setPath(ogmsPath);
             bulkDataLink.setConfigFile(true);
             if (DataTemplateType.equals("id")){
-                bulkDataLink.setDataTemplate(dataTemplateId);
+                bulkDataLink.setDataTemplateId(dataTemplateId);
                 bulkDataLink.setType("template");
+            }else if (DataTemplateType.equals("schema")){
+                bulkDataLink.setDataTemplate(dataTemplate);
+                bulkDataLink.setType("schema");
             }else {
                 bulkDataLink.setType(DataTemplateType);
             }
@@ -224,7 +275,7 @@ public class DataContainerController {
     }
 
     //接口4 批量下载
-    @RequestMapping(value = "/bulkDownLoad",method = RequestMethod.GET)
+    @RequestMapping(value = "/bulkDownload",method = RequestMethod.GET)
     public void bulkDownLoad(@RequestParam(value = "oids") List<String> oids, HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         boolean delCacheFile = false;
@@ -347,14 +398,112 @@ public class DataContainerController {
         return jsonResult;
     }
 
-    //断点续传接口Breakpoint continuation
-    @RequestMapping(value = "dataBPContinue", method = RequestMethod.GET)
-    public void dataBPContinue(@RequestParam String oid,HttpServletResponse response){
+    //可视化接口
+    @RequestMapping(value = "/visual", method = RequestMethod.GET)
+    public void visual(@RequestParam(value = "oid") String oid,HttpServletResponse response) throws Exception {
+        File picCache = new File(visualPath + "/" + oid + ".png");
+        if (!picCache.exists()) {
+            BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
+            String dataTemplate = bulkDataLink.getDataTemplate();
+            VisualCategory visualCategory = visualCategoryDao.findFirstByOid(dataTemplate);
+//        if (visualCategory == null){
+//            jsonResult.setMsg("This data cannot be visualized");
+//            jsonResult.setCode(-1);
+//            return jsonResult;
+//        }
+            String visualType = visualCategory.getCategory();
+            //获取可视化文件的path
+            String path = null;
+            //将zip包进行解压
+            String zipPath = bulkDataLink.getPath();
+            String zipFile = bulkDataLink.getPath() + "/" + bulkDataLink.getZipOid() + ".zip";
+            dataContainer.zipUncompress(zipFile, zipPath);
+            //匹配shp或tiff文件
+            for (String dataOid : bulkDataLink.getDataOids()) {
+                DataListCom dataListCom = dataListComDao.findFirstByOid(dataOid);
+                String fileName = dataListCom.getFileName();
+                //取文件名后缀
+                String suffix = fileName.substring(fileName.lastIndexOf(".") + 1);
+                if (suffix.equals("shp")) {
+                    path = zipPath;
+                } else if (suffix.equals("tif")) {
+                    path = zipPath + "/" + dataListCom.getFileName();
+                }
+            }
 
+//        String picId = UUID.randomUUID().toString();
+            String outPath = "E:\\upload\\picCache" + "\\" + oid;
+            if (visualType.equals("shp")) {
+                //调用shp可视化方法
+                try {
+                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};
+                    //部署时解开
+//                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
+                    Process proc = Runtime.getRuntime().exec(args);// 执行py文件
+
+                    BufferedReader in = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+                    String line = null;
+                    while ((line = in.readLine()) != null) {
+                        System.out.println(line);
+                    }
+                    in.close();
+                    proc.waitFor();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } else if (visualType.equals("tiff")) {
+                //调用tiff可视化方法
+                try {
+                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};
+                    //部署时解开
+//                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
+                    Process proc = Runtime.getRuntime().exec(args);// 执行py文件
+
+                    BufferedReader in = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+                    String line = null;
+                    while ((line = in.readLine()) != null) {
+                        System.out.println(line);
+                    }
+                    in.close();
+                    proc.waitFor();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            //执行python脚本之后删除解压后的文件
+            dataContainer.deleteZipUncompress(zipFile, zipPath);
+        }else {
+            //将生成的文件进行下载
+            File picFile = new File(visualPath + "/" + oid + ".png");
+            dataContainer.downLoadFile(response, picFile, oid + ".png");
+        }
     }
 
+    //增加可视化方法
+    @RequestMapping(value = "/addVisual", method = RequestMethod.POST)
+    public JsonResult addVisual(@RequestParam(value = "oid") String oid,
+                                @RequestParam(value = "category") String category){
+        JsonResult jsonResult = new JsonResult();
+        VisualCategory visualCategory = new VisualCategory();
+        visualCategory.setCategory(category);
+        visualCategory.setOid(oid);
+        visualCategoryDao.save(visualCategory);
+        return jsonResult;
+    }
+
+    //断点续传接口Breakpoint continuation
+    @RequestMapping(value = "/dataBPContinue", method = RequestMethod.GET)
+    public void dataBPContinue(@RequestParam(value = "oid") String oid,
+                               @RequestParam(value = "savePath") String savePath,
+                               HttpServletResponse response) throws IOException, InterruptedException {
+        //savePath为存储路径，用于存储临时文件等文件
+        boolean downLoadLog = false;
+        downLoadLog = dataContainer.downBPContinue(oid,savePath,response);
+    }
 
     //以本名上传
-
-
 }

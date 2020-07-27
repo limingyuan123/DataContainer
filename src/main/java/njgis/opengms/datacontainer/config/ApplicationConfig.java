@@ -12,8 +12,8 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class ApplicationConfig {
     //解决RestTemplate的bean无法注入问题
-    //Spring Boot<=1.3 无需定义，Spring Boot自动为您定义了一个。
-    //Spring Boot >= 1.4 Spring Boot不再自动定义一个RestTemplate，而是定义了一个RestTemplateBuilder允许您更好地控制所RestTemplate创建的对象
+    //Spring Boot<=1.3 无需定义，Spring Boot自动定义了一个。
+    //Spring Boot >= 1.4 Spring Boot不再自动定义一个RestTemplate，而是定义了一个RestTemplateBuilder允许更好地控制所RestTemplate创建的对象
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder){
         return builder.build();

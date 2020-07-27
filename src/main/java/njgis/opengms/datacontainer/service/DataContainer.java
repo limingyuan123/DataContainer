@@ -7,11 +7,11 @@ import njgis.opengms.datacontainer.dao.DataListComDao;
 import njgis.opengms.datacontainer.dao.DataListDao;
 import njgis.opengms.datacontainer.dao.ReferenceZeroTimeDao;
 import njgis.opengms.datacontainer.entity.BulkDataLink;
-import njgis.opengms.datacontainer.entity.DataList;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.ReferenceZeroTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import njgis.opengms.datacontainer.thread.MergeRunnable;
+import njgis.opengms.datacontainer.thread.SplitRunnable;
+import njgis.opengms.datacontainer.utils.FileUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,13 +22,18 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+
+import static njgis.opengms.datacontainer.utils.FileUtil.leftPad;
 
 /**
  * @Author mingyuan
@@ -53,13 +58,25 @@ public class DataContainer {
     @Value("${resourcePath}")
     private String resourcePath;
 
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    private String bkFileName = null;
+    private String bkTmpFileName = null;
+    private int threadNum = 0;
+    //计数器，主要用来完成缓存文件删除
+    private CountDownLatch latch = null;
+
+    private long fileLength = 0l;
+    private long threadLength = 0l;
+    private long[] startPos;//保存每个线程下载数据的起始位置
+    private long[] endPos;//保存每个线程下载数据的截至位置
+
+    private boolean bool = false;
+    private URL url = null;
 
     public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist) throws IOException {
         BufferedInputStream bis = null;
         ZipOutputStream zos = null;
         InputStream inputStream = null;
-        DataList dataList = new DataList();
+//        DataList dataList = new DataList();
         try {
             File filePath = new File(ogmsPath);
             if (!filePath.exists()){
@@ -87,6 +104,8 @@ public class DataContainer {
                         break;
                     }
                 }
+
+//                log.info("文件大小" + files[i]);
 
                 inputStream = files[i].getInputStream();
                 String streamFileName = files[i].getOriginalFilename();
@@ -278,9 +297,13 @@ public class DataContainer {
         return downLoadLog;
     }
 
+    //参数为需要下载的文件路径下的文件、下载用的文件名以及response
     public boolean downLoadFile(HttpServletResponse response, File file, String fileName) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
+        log.info("文件大小" + file.length());
+
         response.setContentType("application/force-download");
+        response.setContentLength((int) file.length());
         response.addHeader("Content-Disposition", "attachment;fileName=" + new String(fileName.getBytes(StandardCharsets.UTF_8),"ISO8859-1"));
         byte[] buffer = new byte[1024];
         FileInputStream fis = null;
@@ -566,9 +589,6 @@ public class DataContainer {
                 }
             }
         }
-//        if (!delLog){
-//            logger.error("删除失败，或无文件");
-//        }
     }
     public Boolean deleteDataListCom(String oid){
         boolean delLog = false;
@@ -585,4 +605,137 @@ public class DataContainer {
 
         return delLog;
     }
+
+    //解压文件
+    public void zipUncompress(String inputFile,String destDirPath) throws Exception {
+        File srcFile = new File(inputFile);
+        if (!srcFile.exists()){
+            throw new Exception(srcFile.getPath() + "所指文件不存在");
+        }
+        ZipFile zipFile = new ZipFile(srcFile);
+        Enumeration<?> entries = zipFile.entries();
+        while (entries.hasMoreElements()) {
+            ZipEntry entry = (ZipEntry) entries.nextElement();
+            // 如果是文件夹，就创建个文件夹
+            if (entry.isDirectory()) {
+                String dirPath = destDirPath + "/" + entry.getName();
+                srcFile.mkdirs();
+            } else {
+                // 如果是文件，就先创建一个文件，然后用io流把内容copy过去
+                File targetFile = new File(destDirPath + "/" + entry.getName());
+                // 保证这个文件的父文件夹必须要存在
+                if (!targetFile.getParentFile().exists()) {
+                    targetFile.getParentFile().mkdirs();
+                }
+                targetFile.createNewFile();
+                // 将压缩文件内容写入到这个文件中
+                InputStream is = zipFile.getInputStream(entry);
+                FileOutputStream fos = new FileOutputStream(targetFile);
+                int len;
+                byte[] buf = new byte[1024];
+                while ((len = is.read(buf)) != -1) {
+                    fos.write(buf, 0, len);
+                }
+                // 关流顺序，先打开的后关闭
+
+                fos.close();
+                is.close();
+            }
+        }
+        zipFile.close();
+    }
+
+    ////执行python脚本之后删除解压后的文件
+    public Boolean deleteZipUncompress(String zipFile,String zipPath){
+        boolean delLog = false;
+        File zipFilePath = new File(zipPath);
+        File[] files = zipFilePath.listFiles();
+        assert files != null;
+        for (File file: files){
+            //先进行判断，避免删掉原zip文件
+            String zipName = intercept(file.getAbsolutePath());
+            String zipFileName = intercept(zipFile);
+            if (!zipName.equals(zipFileName)){
+                //判断是文件还是文件夹
+                if (file.isFile()){
+                    deleteFile(file.getAbsolutePath());
+                }else {
+                    deleteDirectory(file.getAbsolutePath());
+                }
+            }
+        }
+        delLog = true;
+        return delLog;
+    }
+
+    //截取路径/\后的元素
+    public String intercept(String input){
+        int index = input.lastIndexOf("\\");
+        int index1 = input.lastIndexOf("/");
+        if (index!=-1){
+            return input.substring(index+1,input.length());
+        }else{
+            return input.substring(index1+1,input.length());
+        }
+    }
+
+    //断点续传
+    public Boolean downBPContinue(String oid,String savePath, HttpServletResponse response) throws InterruptedException, IOException {
+        boolean downLoadLog = false;
+        //下载方法
+        BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
+        String fileName = bulkDataLink.getPath() + "/" + bulkDataLink.getZipOid() + ".zip";
+        log.info(fileName);
+
+        File file = new File(fileName);
+        long fileLength = file.length();
+        int threadNum = 5;
+        long blockFileSize = fileLength%threadNum == 0?fileLength/threadNum:fileLength/threadNum+1;
+        splitBySize(fileName, (int) blockFileSize);
+
+        //等待分割结束
+        Thread.sleep(10000);
+//        mergePartFiles(fileLength,bulkDataLink.getPath(),".part", (int) blockFileSize,FileUtil.currentWorkDir + "new.zip");
+        //
+
+
+        return downLoadLog;
+    }
+
+
+    //分割文件
+    public List<String> splitBySize(String fileName, int byteSize){
+        List<String> parts = new ArrayList<String>();
+        File file = new File(fileName);
+        int count = (int) Math.ceil(file.length() / (double) byteSize);
+        int countLen = (count + "").length();
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(5,10,1,
+                TimeUnit.SECONDS,new ArrayBlockingQueue<Runnable>(count * 2));
+        for (int i=0;i<count;i++){
+            String partFileName = file.getParent() + File.separator+  file.getName() + "."
+                    + leftPad((i + 1) + "", countLen, '0') + ".part";
+            threadPool.execute(new SplitRunnable(byteSize, i * byteSize,partFileName, file));
+            parts.add(partFileName);
+        }
+        return parts;
+    }
+
+    //合并文件
+    public void mergePartFiles(long fileLength, String dirPath, String partFileSuffix, int partFileSize, String mergeFileName) throws IOException {
+        ArrayList<File> partFiles = FileUtil.getDirFiles(dirPath,partFileSuffix);
+        Collections.sort(partFiles, new FileUtil.FileComparator());
+        RandomAccessFile randomAccessFile = new RandomAccessFile(mergeFileName, "rw");
+        randomAccessFile.setLength(fileLength);
+        log.info("r_length:  "+randomAccessFile.length());
+        randomAccessFile.close();
+
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(partFiles.size(), partFiles.size() * 3, 1, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<Runnable>(partFiles.size() * 2));
+
+        for (int i=0;i<partFiles.size();i++){
+            threadPool.execute(new MergeRunnable(i * partFileSize,mergeFileName, partFiles.get(i)));
+        }
+    }
+
+
 }
