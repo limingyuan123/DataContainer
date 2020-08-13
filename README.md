@@ -131,7 +131,7 @@ http://221.226.60.2:8082/visual?uid=e684ef96-cbad-468d-853e-e80fe157fbf5
 | origination|developer|
 * 接口示例
 ```
-curl --location --request POST 'http://221.226.60.2:8082/data' \
+curl --location --request POST 'http://221.226.60.2:8082/dataNoneConfig' \
 --form 'ogmsdata=@/path/to/file' \
 --form 'name=test' \
 --form 'userId=1' \
