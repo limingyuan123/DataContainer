@@ -9,6 +9,7 @@ import njgis.opengms.datacontainer.dao.ReferenceZeroTimeDao;
 import njgis.opengms.datacontainer.entity.BulkDataLink;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.ReferenceZeroTime;
+import njgis.opengms.datacontainer.thread.BPContinueThread;
 import njgis.opengms.datacontainer.thread.MergeRunnable;
 import njgis.opengms.datacontainer.thread.SplitRunnable;
 import njgis.opengms.datacontainer.utils.FileUtil;
@@ -22,13 +23,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -58,19 +55,8 @@ public class DataContainer {
     @Value("${resourcePath}")
     private String resourcePath;
 
-    private String bkFileName = null;
-    private String bkTmpFileName = null;
-    private int threadNum = 0;
     //计数器，主要用来完成缓存文件删除
     private CountDownLatch latch = null;
-
-    private long fileLength = 0l;
-    private long threadLength = 0l;
-    private long[] startPos;//保存每个线程下载数据的起始位置
-    private long[] endPos;//保存每个线程下载数据的截至位置
-
-    private boolean bool = false;
-    private URL url = null;
 
     public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist) throws IOException {
         BufferedInputStream bis = null;
@@ -148,6 +134,7 @@ public class DataContainer {
         uploadOGMSData(bulkDataLink,files,configExist);
         return true;
     }
+
     //将每个文件分开存储并存储oid
     public boolean uploadOGMSData(BulkDataLink bulkDataLink, MultipartFile[] files,Boolean configExist) throws IOException {
         List<String> dataOids = new LinkedList<>();
@@ -446,6 +433,7 @@ public class DataContainer {
 //            delLog = deleteFolder(delPath);
 //        }
         //删除dataListCom中文件只引用系数减一
+
         for (int i=0;i<bulkDataLink.getDataOids().size();i++){
             DataListCom dataListCom = dataListComDao.findFirstByOid(bulkDataLink.getDataOids().get(i));
             if (dataListCom.getReferenceCount()>0) {
@@ -471,10 +459,6 @@ public class DataContainer {
         if (delLog){
             //删除对应的数据库内容
             if (bulkDataLink!=null) {
-//                for (int i=0;i<bulkDataLink.getDataOids().size();i++){
-//                    DataListCom dataListCom = dataListComDao.findFirstByOid(bulkDataLink.getDataOids().get(i));
-//                    dataListComDao.delete(dataListCom);
-//                }
                 bulkDataLinkDao.delete(bulkDataLink);
             }
         }
@@ -682,33 +666,126 @@ public class DataContainer {
     //断点续传
     public Boolean downBPContinue(String oid,String savePath, HttpServletResponse response) throws InterruptedException, IOException {
         boolean downLoadLog = false;
+        File downFile = null;
+        File tmpFile = null;
+
         //下载方法
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
         String fileName = bulkDataLink.getPath() + "/" + bulkDataLink.getZipOid() + ".zip";
+        InputStream fis = null;
+        BufferedInputStream bis = null;
+        byte[] buffer = new byte[1024];
+        int len = -1;
         log.info(fileName);
 
         File file = new File(fileName);
         long fileLength = file.length();
+
+        fis = new FileInputStream(file);
+
+        String bpFileName = bulkDataLink.getName();
+        String bpTmpFileName = bpFileName + "_tmp";
+        //下载文件和临时文件
+        downFile = new File(bpFileName);
+        tmpFile = new File(bpTmpFileName);
         int threadNum = 5;
+        long[] startPos = new long[threadNum];//保存每个线程下载数据的起始位置
+        long[] endPos = new long[threadNum];//保存每个线程下载数据的截至位置
         long blockFileSize = fileLength%threadNum == 0?fileLength/threadNum:fileLength/threadNum+1;
-        splitBySize(fileName, (int) blockFileSize);
+        log.info("blockSize: " + blockFileSize + " fileLength: " + fileLength);
+//        splitBySize(fileName, (int) blockFileSize);
 
         //等待分割结束
-        Thread.sleep(10000);
+//        Thread.sleep(10000);
 //        mergePartFiles(fileLength,bulkDataLink.getPath(),".part", (int) blockFileSize,FileUtil.currentWorkDir + "new.zip");
-        //
+
+//        String ranTmpFileName = bpFileName + ".random";
 
 
+        latch = new CountDownLatch(threadNum);
+        if (downFile.exists()&&downFile.length() == fileLength&&!tmpFile.exists()){
+            log.info("file is already exist");
+            return false;
+        }else {
+            //设置start and end
+            setBreakPoint(startPos,endPos,threadNum, blockFileSize, tmpFile,fileLength);
+            //创建可缓存线程池
+            ExecutorService executorService = Executors.newCachedThreadPool();
+            for (int i = 0; i < threadNum; i++) {
+                //执行线程
+                executorService.execute(new BPContinueThread(startPos[i], endPos[i], file, bpFileName, bpTmpFileName, i, latch, fis, fileName, blockFileSize));
+            }
+            latch.await();
+            executorService.shutdown();
+        }
+        //下载完成后，判断是否完整，并删除临时文件
+        if (downFile.length() == fileLength){
+            if (tmpFile.exists()){
+                log.info("delete tmp file");
+                tmpFile.delete();
+            }
+        }
         return downLoadLog;
     }
 
+    private void setBreakPoint(long[] startPos,long[] endPos, int threadNum, long blockFileSize, File tmpFile, long fileLength){
+        RandomAccessFile ranTmpFile = null;
+        try {
+            if (tmpFile.exists()){
+                log.info("continue download");
+                ranTmpFile = new RandomAccessFile(tmpFile, "rw");
+                for (int i=0;i<threadNum;i++){
+                    ranTmpFile.seek(8*i+8);
+                    startPos[i] = ranTmpFile.readLong();
+
+                    ranTmpFile.seek(8*(i+1000) + 16);
+                    endPos[i] = ranTmpFile.readLong();
+
+                    log.info("the array content in the exit file: ");
+                    log.info("the thread" + (i+1) + " startPos: " + startPos[i] + ", endPos: " + endPos[i]);
+                }
+            }else {
+                log.info("the tmpfile is not available!!");
+                ranTmpFile = new RandomAccessFile(tmpFile, "rw");
+                //未续传时初始化
+                for (int i = 0; i < threadNum; i++) {
+                    startPos[i] = i * blockFileSize;
+                    if (i == threadNum - 1) {
+                        endPos[i] = fileLength;
+                    } else {
+                        endPos[i] = blockFileSize * (i + 1) - 1;
+                    }
+                    ranTmpFile.seek(8 * i + 8);
+                    ranTmpFile.writeLong(startPos[i]);
+
+                    ranTmpFile.seek(8 * (i + 1000) + 16);
+                    ranTmpFile.writeLong(endPos[i]);
+
+                    log.info("the Array content : ");
+                    log.info("thre thread" + (i) + " startPos:" + startPos[i] + ", endPos: " + endPos[i]);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+           try {
+               if (ranTmpFile!=null){
+                   ranTmpFile.close();
+               }
+           } catch (IOException e) {
+               e.printStackTrace();
+           }
+        }
+
+    }
 
     //分割文件
-    public List<String> splitBySize(String fileName, int byteSize){
+    public List<String> splitBySize(String fileName, int byteSize) {
         List<String> parts = new ArrayList<String>();
         File file = new File(fileName);
         int count = (int) Math.ceil(file.length() / (double) byteSize);
         int countLen = (count + "").length();
+
         ThreadPoolExecutor threadPool = new ThreadPoolExecutor(5,10,1,
                 TimeUnit.SECONDS,new ArrayBlockingQueue<Runnable>(count * 2));
         for (int i=0;i<count;i++){

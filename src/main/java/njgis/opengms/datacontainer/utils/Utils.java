@@ -361,6 +361,7 @@ public class Utils {
             }
             //文件夹不存在则自动创建
             File tempFile = new File(path);
+
             if (!tempFile.getParentFile().exists()) {
                 tempFile.getParentFile().mkdirs();
             }

@@ -18,10 +18,10 @@ public class DownloadTest {
     @Test
     public void main() {
         int threadNum = 4;
-        String filepath = "http://down.sandai.net/thunder9/Thunder9.1.40.898.exe";
-//        String filepath = "http://192.168.47.130:8082/data?oid=90efe866-d424-44d5-bc1f-b5853aefa8e7";
+//        String filepath = "http://down.sandai.net/thunder9/Thunder9.1.40.898.exe";
+        String filepath = "http://192.168.47.130:8082/data?oid=90efe866-d424-44d5-bc1f-b5853aefa8e7";
 //        String filepath = "http://192.168.47.130:8082/data?oid=857ed9f1-cb61-4e70-9444-e4a23af27311";
         MultiTheradDownload load = new MultiTheradDownload(filepath ,threadNum);
-       load.downloadPart();
+        load.downloadPart();
     }
 }

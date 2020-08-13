@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Break Point Continue Upload</title>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/css/base/bootstrap.min.css"/>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/css/font-awesome/css/font-awesome.min.css"/>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/element-ui/theme-chalk/index.css"/>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/css/page/BPContinue.css">
+    <style>
+        .text {
+            font-size: 14px;
+        }
+
+        .item {
+            padding: 18px 0;
+        }
+
+        .box-card {
+            width: 480px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <el-tag type="info" style="margin:auto;text-align: center;top: 0;left: 0;right: 0;position: absolute;font-size: 25px">Breakpoint resume widget</el-tag>
+    <el-card>
+        <el-input v-model="input" placeholder="Please Input Url" style="width: 50%;margin-top: 10%;margin-left: 10px;margin-bottom: 10%"></el-input>
+        <el-button type="primary" plain @click="bpDownload()">download</el-button>
+        <el-button type="danger" plain @click="suspendDownload()">suspend</el-button>
+        <el-button type="success" plain @click="continueDownload()">continue</el-button>
+    </el-card>
+
+    <el-card class="box-card" style="margin: auto;width: 100%;">
+        <div v-for="o in 4" :key="o" class="text item">
+            {{'列表内容 ' + o }}
+        </div>
+    </el-card>
+</div>
+</body>
+<script type="text/javascript" src="/static/js/common/jquery-3.3.1.js"></script>
+<script src="/static/js/common/bootstrap.min.js"></script>
+<script type="text/javascript" src="/static/js/common/axios.min.js"></script>
+<script type="text/javascript" src="/static/js/common/vue.min.js"></script>
+<script src="/static/element-ui/index.js"></script>
+<script src="/static/element-ui/umd/locale/en.js"></script>
+<script type="text/javascript" src="/static/js/page/BPContinue.js"></script>
+<script src="/static/element-ui/index.js"></script>
+<script type="text/javascript" src="/static/iCheck/jquery.icheck.min.js"></script>
+
+</html>

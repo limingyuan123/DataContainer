@@ -13,6 +13,7 @@ import njgis.opengms.datacontainer.utils.Utils;
 import org.dom4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
@@ -63,6 +64,14 @@ public class DataContainerController {
         ModelAndView testUpload = new ModelAndView();
         testUpload.setViewName("testUpload");
         return testUpload;
+    }
+
+    //断点续传工具接口
+    @RequestMapping("/BPContinue")
+    public ModelAndView BPContinue(){
+        ModelAndView BPContinue = new ModelAndView();
+        BPContinue.setViewName("BPContinue");
+        return BPContinue;
     }
 
     //test接口
@@ -242,8 +251,9 @@ public class DataContainerController {
 
     //接口2 下载数据
     @RequestMapping(value = "/data", method = RequestMethod.GET)
-    public void downLoadFile(@RequestParam String oid, HttpServletResponse response) throws UnsupportedEncodingException {
+    public void downLoadFile(@RequestParam String uid, HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
+        String oid = uid;
         downLoadLog = dataContainer.downLoad(oid,response);
         JsonResult jsonResult = new JsonResult();
         if (downLoadLog){
@@ -258,8 +268,9 @@ public class DataContainerController {
 
     //接口3 删除指定上传数据
     @RequestMapping(value = "/del", method = RequestMethod.DELETE)
-    public JsonResult del(@RequestParam(value = "oid") String oid){
+    public JsonResult del(@RequestParam String uid){
         JsonResult jsonResult = new JsonResult();
+        String oid = uid;
         boolean delLog = false;
 
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
@@ -400,17 +411,13 @@ public class DataContainerController {
 
     //可视化接口
     @RequestMapping(value = "/visual", method = RequestMethod.GET)
-    public void visual(@RequestParam(value = "oid") String oid,HttpServletResponse response) throws Exception {
+    public void visual(@RequestParam(value = "uid") String uid,HttpServletResponse response) throws Exception {
+        String oid = uid;
         File picCache = new File(visualPath + "/" + oid + ".png");
         if (!picCache.exists()) {
             BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
-            String dataTemplate = bulkDataLink.getDataTemplate();
-            VisualCategory visualCategory = visualCategoryDao.findFirstByOid(dataTemplate);
-//        if (visualCategory == null){
-//            jsonResult.setMsg("This data cannot be visualized");
-//            jsonResult.setCode(-1);
-//            return jsonResult;
-//        }
+            String dataTemplateId = bulkDataLink.getDataTemplateId();
+            VisualCategory visualCategory = visualCategoryDao.findFirstByOid(dataTemplateId);
             String visualType = visualCategory.getCategory();
             //获取可视化文件的path
             String path = null;
@@ -432,11 +439,13 @@ public class DataContainerController {
             }
 
 //        String picId = UUID.randomUUID().toString();
-            String outPath = "E:\\upload\\picCache" + "\\" + oid;
+//            String outPath = "E:\\upload\\picCache" + "\\" + oid;//dev
+            String outPath = "\\data\\picCache" + "/" + oid;//prod
             if (visualType.equals("shp")) {
                 //调用shp可视化方法
                 try {
-                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};
+//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//dev
+                    String[] args = new String[]{"python", "\\data\\visualMethods\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
                     //部署时解开
 //                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
@@ -456,7 +465,8 @@ public class DataContainerController {
             } else if (visualType.equals("tiff")) {
                 //调用tiff可视化方法
                 try {
-                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};
+//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};
+                    String[] args = new String[]{"python", "\\data\\visualMethods\\tiff.py", String.valueOf(path), String.valueOf(oid)};
                     //部署时解开
 //                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
@@ -486,7 +496,7 @@ public class DataContainerController {
     //增加可视化方法
     @RequestMapping(value = "/addVisual", method = RequestMethod.POST)
     public JsonResult addVisual(@RequestParam(value = "oid") String oid,
-                                @RequestParam(value = "category") String category){
+                                @RequestParam(value = "category") String category) {
         JsonResult jsonResult = new JsonResult();
         VisualCategory visualCategory = new VisualCategory();
         visualCategory.setCategory(category);
@@ -506,4 +516,6 @@ public class DataContainerController {
     }
 
     //以本名上传
+
+    //更改dataTemplate接口
 }

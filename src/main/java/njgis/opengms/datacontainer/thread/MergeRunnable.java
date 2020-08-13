@@ -11,6 +11,7 @@ public class MergeRunnable implements Runnable{
     String mergeFileName;
     File partFile;
 
+    //构造函数，没有返回值
     public MergeRunnable(long startPos, String mergeFileName, File partFile){
         this.startPos = startPos;
         this.mergeFileName = mergeFileName;

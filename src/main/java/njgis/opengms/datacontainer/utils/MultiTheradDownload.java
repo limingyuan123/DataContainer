@@ -58,8 +58,6 @@ public class MultiTheradDownload {
             conn.setRequestMethod("GET");
             conn.setReadTimeout(60000);
             conn.setConnectTimeout(5000);
-            InputStream inputStream = null;
-            inputStream = conn.getInputStream();
 
             //下载文件的总长度
             fileLength = conn.getContentLengthLong();
@@ -85,15 +83,12 @@ public class MultiTheradDownload {
                 latch.await();//当你的计数器减为0之前，会在此处一直阻塞
                 exec.shutdown();
             }
-        }catch (MalformedURLException e){
-            e.printStackTrace();
-        }catch (IOException e){
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+        } catch (IOException | InterruptedException e){
             e.printStackTrace();
         }
 
         //下载完成后，判断文件是否完整，并删除临时文件
+        assert file != null;
         if (file.length() == fileLength){
             if (tmpFile.exists()){
                 log.info("删除临时文件");
@@ -190,7 +185,7 @@ public class MultiTheradDownload {
         }
 
         @Override
-        public void run() {
+        public synchronized void run() {
             HttpURLConnection httpCon = null;
             InputStream inputStream = null;
             int length = 0;

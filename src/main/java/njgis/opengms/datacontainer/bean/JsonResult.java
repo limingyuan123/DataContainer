@@ -16,7 +16,7 @@ import java.io.Serializable;
 @NoArgsConstructor
 @Builder
 public class JsonResult<T> implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;//JAVA序列化的机制是通过判断类的serialVersionUID来验证的版本一致的
 
     private Integer code=0;
     private String msg="success";
