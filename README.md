@@ -167,7 +167,7 @@ http://221.226.60.2:8082/editTemplateId?oid=af44f4c9-da19-480f-9253-f21250fa10a5
 ```
 * 返回值
 新增成功：
-```
+```json
 {
     "code": 0,
     "msg": "add success",
@@ -175,10 +175,40 @@ http://221.226.60.2:8082/editTemplateId?oid=af44f4c9-da19-480f-9253-f21250fa10a5
 }
 ```
 编辑成功
-```
+```json
 {
     "code": 0,
     "msg": "edit success",
     "data": "oid is af44f4c9-da19-480f-9253-f21250fa10a5"
+}
+```
+## 全局搜索接口
+* 请求方式
+```GET```
+* 接口参数
+```PARAMS```
+*************
+| 字段  |示例值  |意义|
+|---|--|--|
+|name|shp  |全局搜索的关键字名称|
+* 接口示例
+```
+http://221.226.60.2:8082/globalSearch?name=test特殊符号
+```
+* 返回值
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": [
+        {
+            "name": "test特殊符号",
+            "oid": "5d96a719-d260-4f1b-99c7-19f22b337de8"
+        },
+        {
+            "name": "test特殊符号",
+            "oid": "5d96a719-d260-4f1b-99c7-19f22b337de8"
+        }
+    ]
 }
 ```
