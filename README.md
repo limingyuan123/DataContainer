@@ -213,7 +213,7 @@ http://221.226.60.2:8082/globalSearch?name=test特殊符号
 }
 ```
 ## 配置文件
-### 字段
+* 字段
 ```
 <UDXZip>
     <Name> 文件列表，不包含配置文件，数目要上传文件数一致（不包含配置文件）
@@ -223,7 +223,7 @@ http://221.226.60.2:8082/globalSearch?name=test特殊符号
     <DataTemplate    type:数据类型，可选参数 id, schema, none > 数据类型id,在type为id时有值</DataTemplate>
 </UDXZip>
 ```
-### 基本内容
+* 基本内容
 ```
 <UDXZip>
 	<Name>//列出文件名，文件名不需要一一对应，但文件个数要和实际上传文件数对应
@@ -238,7 +238,7 @@ http://221.226.60.2:8082/globalSearch?name=test特殊符号
 	<DataTemplate type="id">d3605b83-af8d-491c-91b3-a0e0bf3fe714</DataTemplate>
 </UDXZip>
 ```
-### 可选模板
+* 可选模板
 ```
 主要在type为id的数据类型，进行可视化时使用
 
