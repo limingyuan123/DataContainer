@@ -3,6 +3,7 @@ package njgis.opengms.datacontainer.thread;
 import org.dom4j.io.OutputFormat;
 
 import java.io.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @Author mingyuan
@@ -14,6 +15,7 @@ public class SplitRunnable implements Runnable{
     File originFile;
     long startPos;
 
+    private final AtomicLong count = new AtomicLong(0);
     public SplitRunnable(int byteSize,int startPos,String partFileName,File originFile){
         this.byteSize = byteSize;
         this.startPos = startPos;
@@ -25,6 +27,7 @@ public class SplitRunnable implements Runnable{
     public void run() {
         RandomAccessFile rFile;
         OutputStream outputStream;
+        count.incrementAndGet();
         try {
             rFile = new RandomAccessFile(originFile, "r");
             byte[] bytes = new byte[byteSize];

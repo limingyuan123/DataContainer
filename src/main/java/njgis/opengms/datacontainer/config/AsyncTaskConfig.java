@@ -13,7 +13,7 @@ import java.util.concurrent.Executor;
  * @Author mingyuan
  * @Date 2020.07.13 15:33
  */
-@Configuration
+@Configuration//告知spring这是一个配置类
 @EnableAsync
 //配置类实现接口AsyncConfigurator，返回一个ThreadPoolTaskExecutor线程池对象
 public class AsyncTaskConfig implements AsyncConfigurer {

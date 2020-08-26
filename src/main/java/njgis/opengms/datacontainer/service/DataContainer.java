@@ -596,6 +596,7 @@ public class DataContainer {
         if (!srcFile.exists()){
             throw new Exception(srcFile.getPath() + "所指文件不存在");
         }
+
         ZipFile zipFile = new ZipFile(srcFile);
         Enumeration<?> entries = zipFile.entries();
         while (entries.hasMoreElements()) {
@@ -649,6 +650,7 @@ public class DataContainer {
             }
         }
         delLog = true;
+        log.info("删除结束");
         return delLog;
     }
 

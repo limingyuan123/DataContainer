@@ -1,6 +1,7 @@
 package njgis.opengms.datacontainer.controller;
 
 import com.alibaba.fastjson.JSONObject;
+import com.sun.org.apache.regexp.internal.RE;
 import lombok.extern.slf4j.Slf4j;
 import njgis.opengms.datacontainer.bean.JsonResult;
 import njgis.opengms.datacontainer.dao.*;
@@ -425,6 +426,7 @@ public class DataContainerController {
             String zipPath = bulkDataLink.getPath();
             String zipFile = bulkDataLink.getPath() + "/" + bulkDataLink.getZipOid() + ".zip";
             dataContainer.zipUncompress(zipFile, zipPath);
+            log.info("已解压文件，过");
             //匹配shp或tiff文件
             for (String dataOid : bulkDataLink.getDataOids()) {
                 DataListCom dataListCom = dataListComDao.findFirstByOid(dataOid);
@@ -437,18 +439,22 @@ public class DataContainerController {
                     path = zipPath + "/" + dataListCom.getFileName();
                 }
             }
+            log.info("已取得后缀，确定可视化类型，过");
 
 //        String picId = UUID.randomUUID().toString();
 //            String outPath = "E:\\upload\\picCache" + "\\" + oid;//dev
-            String outPath = "\\data\\picCache" + "/" + oid;//prod
+            String outPath = "/data/picCache" + "/" + oid;//prod
             if (visualType.equals("shp")) {
                 //调用shp可视化方法
                 try {
 //                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//dev
-                    String[] args = new String[]{"python", "\\data\\visualMethods\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
+                    String[] args = new String[]{"python", "/data/visualMethods/shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
+                    log.info("input: " + path + "output: " + outPath);;
+
                     //部署时解开
 //                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
+                    log.info("成功执行shp处理文件，pass");
 
                     BufferedReader in = new BufferedReader(new InputStreamReader(proc.getInputStream()));
                     String line = null;
@@ -465,11 +471,12 @@ public class DataContainerController {
             } else if (visualType.equals("tiff")) {
                 //调用tiff可视化方法
                 try {
-//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};
-                    String[] args = new String[]{"python", "\\data\\visualMethods\\tiff.py", String.valueOf(path), String.valueOf(oid)};
+//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};//dev
+                    String[] args = new String[]{"python", "/data/visualMethods/tiff.py", String.valueOf(path), String.valueOf(oid)};//prod
                     //部署时解开
 //                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
+                    log.info("成功执行tiff处理文件，pass");
 
                     BufferedReader in = new BufferedReader(new InputStreamReader(proc.getInputStream()));
                     String line = null;
@@ -486,10 +493,15 @@ public class DataContainerController {
             }
             //执行python脚本之后删除解压后的文件
             dataContainer.deleteZipUncompress(zipFile, zipPath);
+            log.info("删除解压后的文件成功，pass");
+            File picFile = new File(visualPath + "/" + oid + ".png");
+            dataContainer.downLoadFile(response, picFile, oid + ".png");
+            log.info("首次下载成功");
         }else {
             //将生成的文件进行下载
             File picFile = new File(visualPath + "/" + oid + ".png");
             dataContainer.downLoadFile(response, picFile, oid + ".png");
+            log.info("取得缓存下载成功");
         }
     }
 
@@ -517,5 +529,66 @@ public class DataContainerController {
 
     //以本名上传
 
-    //更改dataTemplate接口
+    //新增dataTemplateId接口
+    @RequestMapping(value = "/editTemplateId",method = RequestMethod.POST)
+    public JsonResult addTemplateId(@RequestParam(value = "oid") String oid,
+                                    @RequestParam(value = "templateId") String templateId,
+                                    @RequestParam(value = "type") String type){
+        JsonResult result = new JsonResult();
+        BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
+
+        //编辑templateId
+        if (type.equals("edit")){
+            if (bulkDataLink.getDataTemplateId() == null){
+                result.setMsg("dataTemplateId not exist!!!");
+                result.setCode(-1);
+                return result;
+            }else {
+                bulkDataLink.setDataTemplateId(templateId);
+                bulkDataLinkDao.save(bulkDataLink);
+                result.setMsg("edit success");
+                result.setCode(0);
+                result.setData("oid is "+ oid);
+                return result;
+            }
+        }else {
+            //判断oid的configFile是否为false
+            if (bulkDataLink.getConfigFile()) {
+                result.setCode(-1);
+                result.setMsg("Only data without template id can be added");
+                return result;
+            } else {
+                //新增templateId
+                bulkDataLink.setDataTemplateId(templateId);
+                bulkDataLinkDao.save(bulkDataLink);
+                result.setCode(0);
+                result.setMsg("add success");
+                result.setData("oid is " + oid);
+            }
+            return result;
+        }
+    }
+
+    //全局搜索功能
+    @RequestMapping(value = "/globalSearch", method = RequestMethod.GET)
+    public JsonResult globalSearch(@RequestParam(value = "name") String name){
+        JsonResult result = new JsonResult();
+        HashMap<String,String> data = new HashMap<>();
+        List<BulkDataLink> bulkDataLinks = new ArrayList<>();
+        ArrayList<HashMap> datas = new ArrayList<>();
+
+        bulkDataLinks = bulkDataLinkDao.findAll();
+
+        for (BulkDataLink bulkDataLink:bulkDataLinks){
+            if (bulkDataLink.getName().equals(name)){
+                data.put("name",name);
+                data.put("oid",bulkDataLink.getZipOid());
+                datas.add(data);
+            }
+        }
+        result.setData(datas);
+        result.setCode(0);
+        return result;
+    }
+
 }
