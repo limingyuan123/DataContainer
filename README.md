@@ -212,6 +212,44 @@ http://221.226.60.2:8082/globalSearch?name=test特殊符号
     ]
 }
 ```
+## 元数据接口
+* 请求方式
+```GET```
+* 接口参数
+```PARAMS```
+*************
+| 字段  |示例值  |意义|
+|---|--|--|
+|dataId|ffa79772-5b31-4802-b56a-e54433bc5a6c  |数据id|
+* 接口示例
+```
+http://221.226.60.2:8082/getMetaData?dataId=ffa79772-5b31-4802-b56a-e54433bc5a6c
+```
+* 返回值
+```json
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "zipOid": "fcc70a25-14c5-4e80-9747-8966b2e22d90",
+        "dataOids": [
+            "320101f6-7c7b-497b-998d-8d25300ce0e7",
+            "22c50b1d-db04-41c2-bb4a-e793275a10a0"
+        ],
+        "name": "test特殊符号",
+        "origination": "portal",
+        "serverNode": "china",
+        "uid": "65",
+        "date": "2020-08-28T11:37:31.845+0000",
+        "type": "template",
+        "dataTemplate": null,
+        "dataTemplateId": "1816a01c-343a-472e-027c-6390fe3eba70",
+        "path": "E:/upload/upload_ogms/fcc70a25-14c5-4e80-9747-8966b2e22d90",
+        "configFile": true,
+        "cache": null
+    }
+}
+```
 ## 配置文件
 * 字段
 ```
