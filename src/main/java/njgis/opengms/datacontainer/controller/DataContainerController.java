@@ -4,13 +4,17 @@ import com.alibaba.fastjson.JSONObject;
 import com.sun.org.apache.regexp.internal.RE;
 import lombok.extern.slf4j.Slf4j;
 import njgis.opengms.datacontainer.bean.JsonResult;
+import njgis.opengms.datacontainer.config.FtpConfig;
+import njgis.opengms.datacontainer.config.FtpUtil;
 import njgis.opengms.datacontainer.dao.*;
 import njgis.opengms.datacontainer.entity.BulkDataLink;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.Image;
 import njgis.opengms.datacontainer.entity.VisualCategory;
 import njgis.opengms.datacontainer.service.DataContainer;
+import njgis.opengms.datacontainer.thread.UploadThread;
 import njgis.opengms.datacontainer.utils.Utils;
+import org.apache.commons.net.ftp.FTPClient;
 import org.dom4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +31,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static njgis.opengms.datacontainer.config.FavFTPUtil.downloadFile;
+import static njgis.opengms.datacontainer.config.FavFTPUtil.uploadFileFromProduction;
 
 /**
  * @Author mingyuan
@@ -52,6 +59,12 @@ public class DataContainerController {
 
     @Autowired
     VisualCategoryDao visualCategoryDao;
+
+    @Autowired
+    FtpConfig ftpConfig;
+
+//    @Autowired
+//    UploadThread uploadThread;
 
     @Value("${resourcePath}")
     private String resourcePath;
@@ -107,6 +120,8 @@ public class DataContainerController {
                                  @RequestParam("serverNode")String serverNode,
                                  @RequestParam("origination")String origination) throws IOException, DocumentException {
         JsonResult jsonResult = new JsonResult();
+        Date start = new Date();
+        log.info("start time is " + start);
         boolean loadFileLog = false;
         boolean configExist = true;
         Date now = new Date();
@@ -247,6 +262,8 @@ public class DataContainerController {
             jsonObject.put("file_name",uploadName);
             jsonResult.setData(jsonObject);
         }
+        Date end = new Date();
+        log.info("end time is " + end);
         return jsonResult;
     }
 
@@ -442,17 +459,15 @@ public class DataContainerController {
             log.info("已取得后缀，确定可视化类型，过");
 
 //        String picId = UUID.randomUUID().toString();
-//            String outPath = "E:\\upload\\picCache" + "\\" + oid;//dev
-            String outPath = "/data/picCache" + "/" + oid;//prod
+            String outPath = "E:\\upload\\picCache" + "\\" + oid;//dev
+//            String outPath = "/data/picCache" + "/" + oid;//prod
             if (visualType.equals("shp")) {
                 //调用shp可视化方法
                 try {
-//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//dev
-                    String[] args = new String[]{"python", "/data/visualMethods/shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
-                    log.info("input: " + path + "output: " + outPath);;
+                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//dev
+//                    String[] args = new String[]{"python", "/data/visualMethods/shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
+                    log.info("input: " + path + "output: " + outPath);
 
-                    //部署时解开
-//                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
                     log.info("成功执行shp处理文件，pass");
 
@@ -471,10 +486,9 @@ public class DataContainerController {
             } else if (visualType.equals("tiff")) {
                 //调用tiff可视化方法
                 try {
-//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};//dev
-                    String[] args = new String[]{"python", "/data/visualMethods/tiff.py", String.valueOf(path), String.valueOf(oid)};//prod
-                    //部署时解开
-//                String[] args = new String[] { "python", "/data/dataSource/upload_ogms/shp.py", String.valueOf(path), String.valueOf(picId) };
+                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};//dev
+//                    String[] args = new String[]{"python", "/data/visualMethods/tiff.py", String.valueOf(path), String.valueOf(oid)};//prod
+
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
                     log.info("成功执行tiff处理文件，pass");
 
@@ -590,5 +604,59 @@ public class DataContainerController {
         result.setCode(0);
         return result;
     }
+
+    //获取元数据接口
+    @RequestMapping(value = "/getMetaData", method = RequestMethod.GET)
+    public JsonResult getMetaData(@RequestParam(value = "dataId") String dataId){
+        JsonResult jsonResult = new JsonResult();
+        BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(dataId);
+        if (bulkDataLink==null){
+            jsonResult.setCode(-1);
+            jsonResult.setMsg("The data was not found!");
+            return jsonResult;
+        }else {
+            jsonResult.setCode(0);
+            jsonResult.setMsg("success");
+            jsonResult.setData(bulkDataLink);
+            return jsonResult;
+        }
+    }
+
+    //大文件上传至ftp服务器
+    @RequestMapping(value = "/uploadBigFile", method = RequestMethod.POST)
+    public JsonResult uploadBigFile(@RequestParam(value = "bigFile") MultipartFile file) throws IOException {
+        JsonResult result = new JsonResult();
+        String hostname = "192.168.47.130";
+        int port = 21;
+        String username = "ogms1";
+        String password = "123456";
+
+        boolean flag = false;
+
+        boolean res = uploadFileFromProduction(hostname, port, username, password, "/ogms", file);
+        String pathname = "/var/ftp/pub";
+        String filename = "TacoCloud.jpg";
+        String localpath = "D:/";
+      downloadFile(hostname, port, username, password, pathname, filename, localpath);
+
+        return result;
+    }
+
+    //大文件下载
+    @RequestMapping(value = "downloadBigFile", method = RequestMethod.GET)
+    public JsonResult downloadBigFile(@RequestParam(value = "pathName") String pathName,
+                                      @RequestParam(value = "fileName") String fileName){
+        JsonResult result = new JsonResult();
+        String hostname = "192.168.47.130";
+        int port = 21;
+        String username = "ogms1";
+        String password = "123456";
+        String localpath = "D:/";
+
+        downloadFile(hostname, port, username, password, pathName, fileName, localpath);
+
+        return result;
+    }
+
 
 }

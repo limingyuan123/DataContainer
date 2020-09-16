@@ -12,6 +12,7 @@ import njgis.opengms.datacontainer.entity.ReferenceZeroTime;
 import njgis.opengms.datacontainer.thread.BPContinueThread;
 import njgis.opengms.datacontainer.thread.MergeRunnable;
 import njgis.opengms.datacontainer.thread.SplitRunnable;
+import njgis.opengms.datacontainer.thread.UploadThread;
 import njgis.opengms.datacontainer.utils.FileUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,7 +59,8 @@ public class DataContainer {
     //计数器，主要用来完成缓存文件删除
     private CountDownLatch latch = null;
 
-    public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist) throws IOException {
+    public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist)
+            throws IOException {
         BufferedInputStream bis = null;
         ZipOutputStream zos = null;
         InputStream inputStream = null;
@@ -86,7 +88,7 @@ public class DataContainer {
                     //获得文件后缀名
                     String a = files[i].getOriginalFilename().substring(begin, last);
                     //如文件为配置文件，则不压缩
-                    if (a.endsWith(".udxcfg")){
+                    if (a.endsWith(".udxcfg")) {
                         break;
                     }
                 }
@@ -144,99 +146,107 @@ public class DataContainer {
         }else {
             fileLength = files.length;
         }
-        //不存储config文件
+        //todo 开始多线程上传文件
+        ExecutorService uploadPool = Executors.newCachedThreadPool();
         for (int i=0;i<fileLength;i++) {
-            DataListCom dataListCom = new DataListCom();
-            String oid = UUID.randomUUID().toString();
-            String ogmsPath = resourcePath + "/" + oid;
+            int thread = i+1;//标识是第几个线程
             MultipartFile file = files[i];
-            String md5;
-            //先进行md5值匹配，已存在则不再上传文件，md5+1，不存在则上传文件，md5初始化为1
-            md5 = DigestUtils.md5DigestAsHex(file.getInputStream());//生成md5值
-            String id;
-            boolean isMatch = false;
-            List<DataListCom> dataListComs = dataListComDao.findAll();
-            for (DataListCom dataListCom1 : dataListComs){
-                if (md5.equals(dataListCom1.getMd5())){
-                    isMatch = true;
-                    id = dataListCom1.getOid();
-                    referenceCountPlusPlus(id);
-                    dataOids.add(dataListCom1.getOid());
-                    break;
-                }
-            }
-            if (isMatch){
-                continue;
-            }
-
-            File localFile = new File(ogmsPath);
-            //先创建目录
-            if (!localFile.exists()) {
-                localFile.mkdirs();
-            }
-            String originalFilename = file.getOriginalFilename();
-            String path = ogmsPath + "/" + originalFilename;
-
-            log.info("createLocalFile path = {}", path);
-
-            localFile = new File(path);
-            FileOutputStream fos = null;
-            InputStream in = null;
-            try {
-                if (localFile.exists()) {
-                    //如果文件存在删除文件
-                    boolean delete = localFile.delete();
-                    if (delete == false) {
-                        log.error("Delete exist file \"{}\" failed!!!", path, new Exception("Delete exist file \"" + path + "\" failed!!!"));
-                    }
-                }
-                //创建文件
-                if (!localFile.exists()) {
-                    //如果文件不存在，则创建新的文件
-                    localFile.createNewFile();
-                    log.info("Create file successfully,the file is {}", path);
-                }
-
-                //创建文件成功后，写入内容到文件里
-                fos = new FileOutputStream(localFile);
-                in = file.getInputStream();
-
-                byte[] bytes = new byte[1024];
-                int len = -1;
-                while ((len = in.read(bytes)) != -1) {
-                    fos.write(bytes, 0, len);
-                }
-                fos.flush();
-                log.info("Reading uploaded file and buffering to local successfully!");
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return false;
-            } catch (IOException e) {
-                e.printStackTrace();
-                return false;
-            } finally {
-                try {
-                    if (fos != null) {
-                        fos.close();
-                    }
-                    if (in != null) {
-                        in.close();
-                    }
-                }catch (IOException e) {
-                    log.error("InputStream or OutputStream close error : {}", e);
-                    return false;
-                }
-            }
-
-            dataListCom.setOid(oid);
-            dataListCom.setPath(resourcePath + "/" + oid);
-            dataListCom.setFileName(files[i].getOriginalFilename());
-            dataListCom.setMd5(md5);
-            dataListCom.setReferenceCount(1);//引用计数初始化为1
-            dataListComDao.save(dataListCom);
-            dataOids.add(oid);
+            uploadPool.execute(new UploadThread(file,thread,dataOids,resourcePath,dataListComDao,bulkDataLink));
         }
-        bulkDataLink.setDataOids(dataOids);
+
+//        不存储config文件
+//        for (int i=0;i<fileLength;i++) {
+//            DataListCom dataListCom = new DataListCom();
+//            String oid = UUID.randomUUID().toString();
+//            String ogmsPath = resourcePath + "/" + oid;
+//            MultipartFile file = files[i];
+//            String md5;
+//            //先进行md5值匹配，已存在则不再上传文件，md5+1，不存在则上传文件，md5初始化为1
+//            md5 = DigestUtils.md5DigestAsHex(file.getInputStream());//生成md5值
+//            String id;
+//            boolean isMatch = false;
+//            List<DataListCom> dataListComs = dataListComDao.findAll();
+//            for (DataListCom dataListCom1 : dataListComs){
+//                if (md5.equals(dataListCom1.getMd5())){
+//                    isMatch = true;
+//                    id = dataListCom1.getOid();
+//                    referenceCountPlusPlus(id);
+//                    dataOids.add(dataListCom1.getOid());
+//                    break;
+//                }
+//            }
+//            if (isMatch){
+//                continue;
+//            }
+//
+//            File localFile = new File(ogmsPath);
+//            //先创建目录
+//            if (!localFile.exists()) {
+//                localFile.mkdirs();
+//            }
+//            String originalFilename = file.getOriginalFilename();
+//            String path = ogmsPath + "/" + originalFilename;
+//
+//            log.info("createLocalFile path = {}", path);
+//
+//            localFile = new File(path);
+//            FileOutputStream fos = null;
+//            InputStream in = null;
+//            try {
+//                if (localFile.exists()) {
+//                    //如果文件存在删除文件
+//                    boolean delete = localFile.delete();
+//                    if (delete == false) {
+//                        log.error("Delete exist file \"{}\" failed!!!", path, new Exception("Delete exist file \"" + path + "\" failed!!!"));
+//                    }
+//                }
+//                //创建文件
+//                if (!localFile.exists()) {
+//                    //如果文件不存在，则创建新的文件
+//                    localFile.createNewFile();
+//                    log.info("Create file successfully,the file is {}", path);
+//                }
+//
+//                //创建文件成功后，写入内容到文件里
+//                fos = new FileOutputStream(localFile);
+//                in = file.getInputStream();
+//
+//                byte[] bytes = new byte[1024];
+//                int len = -1;
+//                while ((len = in.read(bytes)) != -1) {
+//                    fos.write(bytes, 0, len);
+//                }
+//                fos.flush();
+//                log.info("Reading uploaded file and buffering to local successfully!");
+//            } catch (FileNotFoundException e) {
+//                e.printStackTrace();
+//                return false;
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//                return false;
+//            } finally {
+//                try {
+//                    if (fos != null) {
+//                        fos.close();
+//                    }
+//                    if (in != null) {
+//                        in.close();
+//                    }
+//                }catch (IOException e) {
+//                    log.error("InputStream or OutputStream close error : {}", e);
+//                    return false;
+//                }
+//            }
+//
+//            dataListCom.setOid(oid);
+//            dataListCom.setPath(resourcePath + "/" + oid);
+//            dataListCom.setFileName(files[i].getOriginalFilename());
+//            dataListCom.setMd5(md5);
+//            dataListCom.setReferenceCount(1);//引用计数初始化为1
+//            dataListComDao.save(dataListCom);
+//            dataOids.add(oid);
+//        }
+//        bulkDataLink.setDataOids(dataOids);
         return true;
     }
 
@@ -247,7 +257,7 @@ public class DataContainer {
         if (bulkDataLink == null){
             //两种情况，一种情况是oid输入错误，另一种情况是输入的是dataListCom的oid
             DataListCom dataListCom = dataListComDao.findFirstByOid(oid);
-            if (dataListCom == null){
+            if (dataListCom == null) {
                 downLoadLog = false;
             }else {
                 //下载单文件
@@ -291,7 +301,8 @@ public class DataContainer {
 
         response.setContentType("application/force-download");
         response.setContentLength((int) file.length());
-        response.addHeader("Content-Disposition", "attachment;fileName=" + new String(fileName.getBytes(StandardCharsets.UTF_8),"ISO8859-1"));
+        response.addHeader("Content-Disposition", "attachment;fileName=" + new String(fileName.getBytes(StandardCharsets.UTF_8),
+                "ISO8859-1"));
         byte[] buffer = new byte[1024];
         FileInputStream fis = null;
         BufferedInputStream bis = null;
@@ -551,8 +562,8 @@ public class DataContainer {
     //对md5值为0且为0时间超30天的文件进行删除
     //先测试5秒钟的
     @Scheduled(cron = "*/5 * * * * ?")
-    //部署时解开
-//    @Scheduled(cron = "0 0 23 * * ?")
+    //部署时解开，每月一号凌晨一点
+//    @Scheduled(cron = "0 0 1 1 * ?")
     private void process(){
         timeOutDelete();
     }
