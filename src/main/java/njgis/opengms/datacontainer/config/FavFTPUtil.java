@@ -4,10 +4,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPReply;
+import org.jsoup.helper.HttpConnection;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.ServerSocket;
+import java.net.URL;
 
 /**
  * @Author mingyuan
@@ -223,6 +227,25 @@ public class FavFTPUtil {
             if (!FTPReply.isPositiveCompletion(replyCode)) {
                 return flag;
             }
+            //根据名称拼出ftp下载链接
+//            String strUrl = "ftp://" + hostname + pathname + "/" + filename;
+//            HttpURLConnection conn = null;
+//            try {
+//                URL url = new URL(strUrl);
+//                conn = (HttpURLConnection) url.openConnection();
+//                conn.setRequestMethod("GET");
+//                conn.setConnectTimeout(20*1000);
+//                InputStream inputStream = conn.getInputStream();
+//                long length = conn.getContentLength();
+//                log.info(length+"");
+//
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+
+//            String filePath =
+
+
             // 切换FTP目录
             ftpClient.changeWorkingDirectory(pathname);
             FTPFile[] ftpFiles = ftpClient.listFiles();

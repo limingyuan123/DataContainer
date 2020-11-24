@@ -147,106 +147,106 @@ public class DataContainer {
             fileLength = files.length;
         }
         //todo 开始多线程上传文件
-        ExecutorService uploadPool = Executors.newCachedThreadPool();
-        for (int i=0;i<fileLength;i++) {
-            int thread = i+1;//标识是第几个线程
-            MultipartFile file = files[i];
-            uploadPool.execute(new UploadThread(file,thread,dataOids,resourcePath,dataListComDao,bulkDataLink));
-        }
+//        ExecutorService uploadPool = Executors.newCachedThreadPool();
+//        for (int i=0;i<fileLength;i++) {
+//            int thread = i+1;//标识是第几个线程
+//            MultipartFile file = files[i];
+//            uploadPool.execute(new UploadThread(file,thread,dataOids,resourcePath,dataListComDao,bulkDataLink));
+//        }
 
 //        不存储config文件
-//        for (int i=0;i<fileLength;i++) {
-//            DataListCom dataListCom = new DataListCom();
-//            String oid = UUID.randomUUID().toString();
-//            String ogmsPath = resourcePath + "/" + oid;
-//            MultipartFile file = files[i];
-//            String md5;
-//            //先进行md5值匹配，已存在则不再上传文件，md5+1，不存在则上传文件，md5初始化为1
-//            md5 = DigestUtils.md5DigestAsHex(file.getInputStream());//生成md5值
-//            String id;
-//            boolean isMatch = false;
-//            List<DataListCom> dataListComs = dataListComDao.findAll();
-//            for (DataListCom dataListCom1 : dataListComs){
-//                if (md5.equals(dataListCom1.getMd5())){
-//                    isMatch = true;
-//                    id = dataListCom1.getOid();
-//                    referenceCountPlusPlus(id);
-//                    dataOids.add(dataListCom1.getOid());
-//                    break;
-//                }
-//            }
-//            if (isMatch){
-//                continue;
-//            }
-//
-//            File localFile = new File(ogmsPath);
-//            //先创建目录
-//            if (!localFile.exists()) {
-//                localFile.mkdirs();
-//            }
-//            String originalFilename = file.getOriginalFilename();
-//            String path = ogmsPath + "/" + originalFilename;
-//
-//            log.info("createLocalFile path = {}", path);
-//
-//            localFile = new File(path);
-//            FileOutputStream fos = null;
-//            InputStream in = null;
-//            try {
-//                if (localFile.exists()) {
-//                    //如果文件存在删除文件
-//                    boolean delete = localFile.delete();
-//                    if (delete == false) {
-//                        log.error("Delete exist file \"{}\" failed!!!", path, new Exception("Delete exist file \"" + path + "\" failed!!!"));
-//                    }
-//                }
-//                //创建文件
-//                if (!localFile.exists()) {
-//                    //如果文件不存在，则创建新的文件
-//                    localFile.createNewFile();
-//                    log.info("Create file successfully,the file is {}", path);
-//                }
-//
-//                //创建文件成功后，写入内容到文件里
-//                fos = new FileOutputStream(localFile);
-//                in = file.getInputStream();
-//
-//                byte[] bytes = new byte[1024];
-//                int len = -1;
-//                while ((len = in.read(bytes)) != -1) {
-//                    fos.write(bytes, 0, len);
-//                }
-//                fos.flush();
-//                log.info("Reading uploaded file and buffering to local successfully!");
-//            } catch (FileNotFoundException e) {
-//                e.printStackTrace();
-//                return false;
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//                return false;
-//            } finally {
-//                try {
-//                    if (fos != null) {
-//                        fos.close();
-//                    }
-//                    if (in != null) {
-//                        in.close();
-//                    }
-//                }catch (IOException e) {
-//                    log.error("InputStream or OutputStream close error : {}", e);
-//                    return false;
-//                }
-//            }
-//
-//            dataListCom.setOid(oid);
-//            dataListCom.setPath(resourcePath + "/" + oid);
-//            dataListCom.setFileName(files[i].getOriginalFilename());
-//            dataListCom.setMd5(md5);
-//            dataListCom.setReferenceCount(1);//引用计数初始化为1
-//            dataListComDao.save(dataListCom);
-//            dataOids.add(oid);
-//        }
-//        bulkDataLink.setDataOids(dataOids);
+        for (int i=0;i<fileLength;i++) {
+            DataListCom dataListCom = new DataListCom();
+            String oid = UUID.randomUUID().toString();
+            String ogmsPath = resourcePath + "/" + oid;
+            MultipartFile file = files[i];
+            String md5;
+            //先进行md5值匹配，已存在则不再上传文件，md5+1，不存在则上传文件，md5初始化为1
+            md5 = DigestUtils.md5DigestAsHex(file.getInputStream());//生成md5值
+            String id;
+            boolean isMatch = false;
+            List<DataListCom> dataListComs = dataListComDao.findAll();
+            for (DataListCom dataListCom1 : dataListComs){
+                if (md5.equals(dataListCom1.getMd5())){
+                    isMatch = true;
+                    id = dataListCom1.getOid();
+                    referenceCountPlusPlus(id);
+                    dataOids.add(dataListCom1.getOid());
+                    break;
+                }
+            }
+            if (isMatch){
+                continue;
+            }
+
+            File localFile = new File(ogmsPath);
+            //先创建目录
+            if (!localFile.exists()) {
+                localFile.mkdirs();
+            }
+            String originalFilename = file.getOriginalFilename();
+            String path = ogmsPath + "/" + originalFilename;
+
+            log.info("createLocalFile path = {}", path);
+
+            localFile = new File(path);
+            FileOutputStream fos = null;
+            InputStream in = null;
+            try {
+                if (localFile.exists()) {
+                    //如果文件存在删除文件
+                    boolean delete = localFile.delete();
+                    if (delete == false) {
+                        log.error("Delete exist file \"{}\" failed!!!", path, new Exception("Delete exist file \"" + path + "\" failed!!!"));
+                    }
+                }
+                //创建文件
+                if (!localFile.exists()) {
+                    //如果文件不存在，则创建新的文件
+                    localFile.createNewFile();
+                    log.info("Create file successfully,the file is {}", path);
+                }
+
+                //创建文件成功后，写入内容到文件里
+                fos = new FileOutputStream(localFile);
+                in = file.getInputStream();
+
+                byte[] bytes = new byte[1024];
+                int len = -1;
+                while ((len = in.read(bytes)) != -1) {
+                    fos.write(bytes, 0, len);
+                }
+                fos.flush();
+                log.info("Reading uploaded file and buffering to local successfully!");
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                return false;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            } finally {
+                try {
+                    if (fos != null) {
+                        fos.close();
+                    }
+                    if (in != null) {
+                        in.close();
+                    }
+                }catch (IOException e) {
+                    log.error("InputStream or OutputStream close error : {}", e);
+                    return false;
+                }
+            }
+
+            dataListCom.setOid(oid);
+            dataListCom.setPath(resourcePath + "/" + oid);
+            dataListCom.setFileName(files[i].getOriginalFilename());
+            dataListCom.setMd5(md5);
+            dataListCom.setReferenceCount(1);//引用计数初始化为1
+            dataListComDao.save(dataListCom);
+            dataOids.add(oid);
+        }
+        bulkDataLink.setDataOids(dataOids);
         return true;
     }
 

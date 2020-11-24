@@ -305,7 +305,8 @@ public class DataContainerController {
 
     //接口4 批量下载
     @RequestMapping(value = "/bulkDownload",method = RequestMethod.GET)
-    public void bulkDownLoad(@RequestParam(value = "oids") List<String> oids, HttpServletResponse response) throws UnsupportedEncodingException {
+    public void bulkDownLoad(@RequestParam(value = "oids") List<String> oids, HttpServletResponse response)
+            throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         boolean delCacheFile = false;
         File[] files = new File[oids.size()];
@@ -374,7 +375,7 @@ public class DataContainerController {
         }
         if (delLog){
             jsonResult.setCode(0);
-            jsonResult.setMsg("All fail delete success");
+            jsonResult.setMsg("All file delete success");
         }
         return jsonResult;
     }
@@ -631,32 +632,39 @@ public class DataContainerController {
         String username = "ogms1";
         String password = "123456";
 
-        boolean flag = false;
-
         boolean res = uploadFileFromProduction(hostname, port, username, password, "/ogms", file);
-        String pathname = "/var/ftp/pub";
-        String filename = "TacoCloud.jpg";
-        String localpath = "D:/";
-      downloadFile(hostname, port, username, password, pathname, filename, localpath);
 
         return result;
     }
 
+
     //大文件下载
-    @RequestMapping(value = "downloadBigFile", method = RequestMethod.GET)
-    public JsonResult downloadBigFile(@RequestParam(value = "pathName") String pathName,
-                                      @RequestParam(value = "fileName") String fileName){
+    @RequestMapping(value = "/downloadBigFile", method = RequestMethod.GET)
+    public JsonResult downloadBigFile(@RequestParam(value = "fileName") String fileName,
+                                      HttpServletResponse response) throws UnsupportedEncodingException {
         JsonResult result = new JsonResult();
         String hostname = "192.168.47.130";
         int port = 21;
         String username = "ogms1";
         String password = "123456";
-        String localpath = "D:/";
+
+        String pathName = "/ogms";
+        String filePath = "/data/ftp/ogms";
+//        String filePath = "C:\\Users\\HP\\Desktop\\";
+        String localpath = "/data/ftp";
+
+        File file = new File(filePath+"/" + fileName);
+        if (!file.exists()){
+//            result.setData(-1);
+            result.setMsg("file no exit!");
+            result.setCode(-1);
+            return result;
+        }
+        dataContainer.downLoadFile(response, file, fileName);
+
 
         downloadFile(hostname, port, username, password, pathName, fileName, localpath);
 
         return result;
     }
-
-
 }
