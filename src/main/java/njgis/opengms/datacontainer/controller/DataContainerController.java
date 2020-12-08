@@ -1,5 +1,6 @@
 package njgis.opengms.datacontainer.controller;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.sun.org.apache.regexp.internal.RE;
 import lombok.extern.slf4j.Slf4j;
@@ -113,8 +114,8 @@ public class DataContainerController {
     }
 
     //接口1改进 批量上传ogms数据并分开存储  含配置文件类
-    @RequestMapping(value = "/data", method = RequestMethod.POST)
-    public JsonResult uploadData(@RequestParam("ogmsdata")MultipartFile[] files,
+    @RequestMapping(value = "/configData", method = RequestMethod.POST)
+    public JsonResult uploadData(@RequestParam("datafile")MultipartFile[] files,
                                  @RequestParam("name")String uploadName,
                                  @RequestParam("userId")String userName,
                                  @RequestParam("serverNode")String serverNode,
@@ -133,7 +134,8 @@ public class DataContainerController {
         //参数检验
         if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
             jsonResult.setCode(-1);
-            jsonResult.setMsg("without name or userId or origination or serverNode");
+            jsonResult.setResult("err");
+            jsonResult.setMessage("without name or userId or origination or serverNode");
             return jsonResult;
         }
 
@@ -146,14 +148,16 @@ public class DataContainerController {
             //只有一个配置文件
             if (files[0].getOriginalFilename().equals("config.udxcfg")){
                 loadFileLog = false;
-                jsonResult.setMsg("Only config file,no others");
+                jsonResult.setMessage("Only config file,no others");
                 jsonResult.setCode(-1);
+                jsonResult.setResult("err");
                 return jsonResult;
             }else {
                 //无配置文件
                 loadFileLog = false;
                 jsonResult.setCode(-1);
-                jsonResult.setMsg("No config file");
+                jsonResult.setMessage("No config file");
+                jsonResult.setResult("err");
                 return jsonResult;
             }
         }else {
@@ -231,7 +235,7 @@ public class DataContainerController {
             if (!config){
                 //有多个文件，但不含有配置文件
                 jsonResult.setCode(-1);
-                jsonResult.setMsg("No config file");
+                jsonResult.setMessage("No config file");
                 return jsonResult;
             }
         }
@@ -256,7 +260,8 @@ public class DataContainerController {
             }
             bulkDataLinkDao.save(bulkDataLink);
 
-            jsonResult.setCode(0);
+            jsonResult.setCode(1);
+            jsonResult.setMessage("success");
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("source_store_id",uuid);
             jsonObject.put("file_name",uploadName);
@@ -268,25 +273,16 @@ public class DataContainerController {
     }
 
     //接口2 下载数据
-    @RequestMapping(value = "/data", method = RequestMethod.GET)
-    public void downLoadFile(@RequestParam String uid, HttpServletResponse response) throws UnsupportedEncodingException {
+    @RequestMapping(value = "/data/{uid}", method = RequestMethod.GET)
+    public void downLoadFile(@PathVariable String uid, HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         String oid = uid;
         downLoadLog = dataContainer.downLoad(oid,response);
-        JsonResult jsonResult = new JsonResult();
-        if (downLoadLog){
-            jsonResult.setMsg("download success");
-            jsonResult.setCode(0);
-        }else {
-            jsonResult.setMsg("download fail");
-            jsonResult.setCode(-1);
-        }
-//        return jsonResult;
     }
 
     //接口3 删除指定上传数据
-    @RequestMapping(value = "/del", method = RequestMethod.DELETE)
-    public JsonResult del(@RequestParam String uid){
+    @RequestMapping(value = "/data/{uid}", method = RequestMethod.DELETE)
+    public JsonResult del(@PathVariable String uid){
         JsonResult jsonResult = new JsonResult();
         String oid = uid;
         boolean delLog = false;
@@ -294,17 +290,21 @@ public class DataContainerController {
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
         delLog = dataContainer.delete(oid);
         if (delLog){
-            jsonResult.setMsg("delete success");
-            jsonResult.setCode(0);
+            jsonResult.setResult("suc");
+            jsonResult.setCode(1);
+            jsonResult.setData("");
+            jsonResult.setMessage("delete success");
         }else {
+            jsonResult.setResult("err");
             jsonResult.setCode(-1);
-            jsonResult.setMsg("delete fail");
+            jsonResult.setData("");
+            jsonResult.setMessage("delete fail");
         }
         return jsonResult;
     }
 
     //接口4 批量下载
-    @RequestMapping(value = "/bulkDownload",method = RequestMethod.GET)
+    @RequestMapping(value = "/batchData",method = RequestMethod.GET)
     public void bulkDownLoad(@RequestParam(value = "oids") List<String> oids, HttpServletResponse response)
             throws UnsupportedEncodingException {
         boolean downLoadLog = false;
@@ -346,20 +346,22 @@ public class DataContainerController {
             delCacheFile = dataContainer.deleteFolder(jsonResult.getData().toString());
             if (!delCacheFile){
                 jsonResult.setCode(0);
-                jsonResult.setMsg("downLoad success but delete cache file fail");
+                jsonResult.setResult("err");
+                jsonResult.setMessage("downLoad success but delete cache file fail");
             }else {
-                jsonResult.setCode(0);
-                jsonResult.setMsg("downLoad success");
+                jsonResult.setCode(1);
+                jsonResult.setMessage("downLoad success");
             }
         }else {
-            jsonResult.setMsg("downLoad failed");
+            jsonResult.setMessage("downLoad failed");
+            jsonResult.setResult("err");
             jsonResult.setCode(-1);
         }
         return;
     }
 
     //接口5 批量删除
-    @RequestMapping(value = "bulkDel",method = RequestMethod.DELETE)
+    @RequestMapping(value = "/batchData",method = RequestMethod.DELETE)
     public JsonResult bulkDel(@RequestParam(value = "oids") List<String> oids){
         JsonResult jsonResult = new JsonResult();
         boolean delLog = false;
@@ -369,36 +371,39 @@ public class DataContainerController {
                 BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oids.get(i));
                 String failName = bulkDataLink.getName();
                 jsonResult.setCode(-1);
-                jsonResult.setMsg(failName + "delete fail");
+                jsonResult.setResult("err");
+                jsonResult.setMessage(failName + "delete fail");
                 return jsonResult;
             }
         }
         if (delLog){
-            jsonResult.setCode(0);
-            jsonResult.setMsg("All file delete success");
+            jsonResult.setCode(1);
+            jsonResult.setResult("suc");
+            jsonResult.setMessage("All file delete success");
         }
         return jsonResult;
     }
 
-    //接口6 无需配置文件上传接口
-    @RequestMapping(value = "/dataNoneConfig", method = RequestMethod.POST)
-    public JsonResult dataNoneConfig(@RequestParam("ogmsdata")MultipartFile[] files,
-                                 @RequestParam("name")String uploadName,
-                                 @RequestParam("userId")String userName,
-                                 @RequestParam("serverNode")String serverNode,
-                                 @RequestParam("origination")String origination) throws IOException {
+    //接口6 无需配置文件上传接口,兼容数据交换
+    @RequestMapping(value = "/data", method = RequestMethod.POST)
+    public JsonResult dataNoneConfig(@RequestParam(value = "datafile", required = false)MultipartFile[] files,
+                                 @RequestParam(value = "name", required = false)String uploadName,
+                                 @RequestParam(value = "userId", required = false)String userName,
+                                 @RequestParam(value = "serverNode", required = false)String serverNode,
+                                 @RequestParam(value = "origination", required = false)String origination,
+                                     @RequestParam(value = "datatag", required = false) String datatag) throws IOException {
         JsonResult jsonResult = new JsonResult();
         boolean loadFileLog = false;
         boolean configExist = false;
         Date now = new Date();
         BulkDataLink bulkDataLink = new BulkDataLink();
         String uuid = UUID.randomUUID().toString();
-        //参数检验
-        if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
-            jsonResult.setCode(-1);
-            jsonResult.setMsg("without name or userId or origination or serverNode");
-            return jsonResult;
-        }
+        //参数检验 不需要检验了，兼容没有的
+//        if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
+//            jsonResult.setCode(-1);
+//            jsonResult.setMessage("without name or userId or origination or serverNode");
+//            return jsonResult;
+//        }
         String ogmsPath;
         ogmsPath = resourcePath + "/" + uuid;
         //文件检验
@@ -419,9 +424,10 @@ public class DataContainerController {
             bulkDataLink.setConfigFile(false);
             bulkDataLinkDao.save(bulkDataLink);
 
-            jsonResult.setCode(0);
+            jsonResult.setCode(1);
+            jsonResult.setMessage("success");
             JSONObject jsonObject = new JSONObject();
-            jsonObject.put("source_store_id",uuid);
+            jsonObject.put("id",uuid);
             jsonObject.put("file_name",uploadName);
             jsonResult.setData(jsonObject);
         }
@@ -429,8 +435,8 @@ public class DataContainerController {
     }
 
     //可视化接口
-    @RequestMapping(value = "/visual", method = RequestMethod.GET)
-    public void visual(@RequestParam(value = "uid") String uid,HttpServletResponse response) throws Exception {
+    @RequestMapping(value = "/data/{uid}/preview", method = RequestMethod.GET)
+    public void visual(@PathVariable(value = "uid") String uid,HttpServletResponse response) throws Exception {
         String oid = uid;
         File picCache = new File(visualPath + "/" + oid + ".png");
         if (!picCache.exists()) {
@@ -555,14 +561,15 @@ public class DataContainerController {
         //编辑templateId
         if (type.equals("edit")){
             if (bulkDataLink.getDataTemplateId() == null){
-                result.setMsg("dataTemplateId not exist!!!");
+                result.setMessage("dataTemplateId not exist!!!");
+                result.setResult("err");
                 result.setCode(-1);
                 return result;
             }else {
                 bulkDataLink.setDataTemplateId(templateId);
                 bulkDataLinkDao.save(bulkDataLink);
-                result.setMsg("edit success");
-                result.setCode(0);
+                result.setMessage("edit success");
+                result.setCode(1);
                 result.setData("oid is "+ oid);
                 return result;
             }
@@ -570,14 +577,15 @@ public class DataContainerController {
             //判断oid的configFile是否为false
             if (bulkDataLink.getConfigFile()) {
                 result.setCode(-1);
-                result.setMsg("Only data without template id can be added");
+                result.setResult("err");
+                result.setMessage("Only data without template id can be added");
                 return result;
             } else {
                 //新增templateId
                 bulkDataLink.setDataTemplateId(templateId);
                 bulkDataLinkDao.save(bulkDataLink);
-                result.setCode(0);
-                result.setMsg("add success");
+                result.setCode(1);
+                result.setMessage("add success");
                 result.setData("oid is " + oid);
             }
             return result;
@@ -607,17 +615,23 @@ public class DataContainerController {
     }
 
     //获取元数据接口
-    @RequestMapping(value = "/getMetaData", method = RequestMethod.GET)
-    public JsonResult getMetaData(@RequestParam(value = "dataId") String dataId){
+    @RequestMapping(value = "/data/{uid}/metadata", method = RequestMethod.GET)
+    public JsonResult getMetaData(@PathVariable(value = "uid") String dataId){
         JsonResult jsonResult = new JsonResult();
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(dataId);
+        List<DataListCom> dataListComs = new ArrayList<>();
         if (bulkDataLink==null){
             jsonResult.setCode(-1);
-            jsonResult.setMsg("The data was not found!");
+            jsonResult.setResult("err");
+            jsonResult.setMessage("The data was not found!");
             return jsonResult;
         }else {
-            jsonResult.setCode(0);
-            jsonResult.setMsg("success");
+            for (String dataOid: bulkDataLink.getDataOids()){
+                dataListComs.add(dataListComDao.findFirstByOid(dataOid));
+            }
+            bulkDataLink.setDataListComs(dataListComs);
+            jsonResult.setCode(1);
+            jsonResult.setMessage("success");
             jsonResult.setData(bulkDataLink);
             return jsonResult;
         }
@@ -656,8 +670,9 @@ public class DataContainerController {
         File file = new File(filePath+"/" + fileName);
         if (!file.exists()){
 //            result.setData(-1);
-            result.setMsg("file no exit!");
+            result.setMessage("file no exit!");
             result.setCode(-1);
+            result.setResult("err");
             return result;
         }
         dataContainer.downLoadFile(response, file, fileName);

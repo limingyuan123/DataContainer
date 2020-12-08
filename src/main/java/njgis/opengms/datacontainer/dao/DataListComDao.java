@@ -3,6 +3,8 @@ package njgis.opengms.datacontainer.dao;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.util.List;
+
 /**
  * @Author mingyuan
  * @Date 2020.07.08 14:08

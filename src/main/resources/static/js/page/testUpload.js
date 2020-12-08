@@ -46,7 +46,7 @@ var testUpload = new Vue({
             let configContent = "<UDXZip><Name>";
             for(let index in this.uploadFiles){
                 configContent+="<add value='"+this.uploadFiles[index].name+"' />";
-                formData.append("ogmsdata", this.uploadFiles[index].raw);
+                formData.append("datafile", this.uploadFiles[index].raw);
             }
             configContent += "</Name>";
             if(this.selectValue!=null&&this.selectValue!="none"){
@@ -66,13 +66,13 @@ var testUpload = new Vue({
             //必填参数：name,userId,serverNode,origination,
 
             //test参数
-            formData.append("ogmsdata", configFile);
+            formData.append("datafile", configFile);
             formData.append("name",this.upLoadName);
             formData.append("userId",this.userId);
             formData.append("serverNode",this.serverNode);
             formData.append("origination",this.origination);
             $.ajax({
-                url: "/data",
+                url: "/configData",
                 type:"POST",
                 cache: false,
                 processData: false,
@@ -80,7 +80,7 @@ var testUpload = new Vue({
                 async: true,
                 data:formData,
             }).done((res)=>{
-                if (res.code==0){
+                if (res.code==1){
                     let data = res.data;
                     this.$message.success('Upload success');
                 }else{
