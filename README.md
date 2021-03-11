@@ -175,14 +175,7 @@ curl --location --request POST 'http://221.226.60.2:8082/data' \
 ```
 * 返回值
 ```json
-{
-    "code": 0,
-    "msg": "success",
-    "data": {
-        "file_name": "test",
-        "source_store_id": "25ec8bd5-0bbc-4507-a6b4-2473cb99e970"
-    }
-}
+{"code":1,"message":"upload file success!","data":{"file_name":"test","source_store_id":"6d8b9bad-59f3-495b-9d74-41159f7f4049"},"result":"suc"}
 ```
 ## 更改dataTemplate接口
 * 请求方式
