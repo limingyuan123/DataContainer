@@ -43,6 +43,37 @@ http://221.226.60.2:8082/data/0b86cb92-4380-4075-b6bb-a9a3ac94ad07
 ```
 * 返回值
 下载的数据，无返回值
+## 数据展示接口（下载接口加上信息过滤）
+* 请求方式
+```GET```
+* 接口参数
+| 字段  |示例值  |
+|---|--|
+|id|6649b522-4803-4202-83f4-8c9532c062d5  |
+|type|html|
+* URL
+URL : /data/[id]?type=[file type]
+* 接口示例
+```
+http://221.226.60.2:8082/data/6649b522-4803-4202-83f4-8c9532c062d5?type=html
+```
+* 支持的为HTTP支持的ContentType
+    HTML(0, "text/html;charset=utf-8"),
+    Plain(1, "text/plain"),
+    XML(2, "text/xml"),
+    GIF(3, "image/gif"),
+    JPG(4, "image/jpeg"),
+    PNG(5, "image/png"),
+    XHTML(6, "application/xhtml+xml"),
+    XML_DATA(6, "application/xml"),
+    Atom_XML(6, "application/atom+xml"),
+    JSON(6, "application/json"),
+    PDF(6, "application/pdf"),
+    WORD(6, "application/msword"),
+    OCTET_STREAM(6, "application/octet-stream"),
+    X_WWW_FORM_URLENCODED(6, "application/x-www-form-urlencoded ");
+* 返回值
+页面展示文件内容，例如type为html则不下载数据，展示为网页
 ## 批量下载接口
 * 请求方式
 ```GET```
