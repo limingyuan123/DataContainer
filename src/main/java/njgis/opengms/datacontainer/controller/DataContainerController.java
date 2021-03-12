@@ -8,10 +8,7 @@ import njgis.opengms.datacontainer.bean.JsonResult;
 import njgis.opengms.datacontainer.config.FtpConfig;
 import njgis.opengms.datacontainer.config.FtpUtil;
 import njgis.opengms.datacontainer.dao.*;
-import njgis.opengms.datacontainer.entity.BulkDataLink;
-import njgis.opengms.datacontainer.entity.DataListCom;
-import njgis.opengms.datacontainer.entity.Image;
-import njgis.opengms.datacontainer.entity.VisualCategory;
+import njgis.opengms.datacontainer.entity.*;
 import njgis.opengms.datacontainer.service.DataContainer;
 import njgis.opengms.datacontainer.thread.UploadThread;
 import njgis.opengms.datacontainer.utils.Utils;
@@ -62,7 +59,19 @@ public class DataContainerController {
     VisualCategoryDao visualCategoryDao;
 
     @Autowired
+    BulkDataLinkDao2 bulkDataLinkDao2;
+
+    @Autowired
+    DataListComDao2 dataListComDao2;
+
+    @Autowired
     FtpConfig ftpConfig;
+
+//    @Autowired
+//    UserDao userDao;
+//
+//    @Autowired
+//    TaskDao taskDao;
 
 //    @Autowired
 //    UploadThread uploadThread;
@@ -79,6 +88,13 @@ public class DataContainerController {
         ModelAndView testUpload = new ModelAndView();
         testUpload.setViewName("testUpload");
         return testUpload;
+    }
+
+    @RequestMapping("/operation")
+    public ModelAndView operation(){
+        ModelAndView operation = new ModelAndView();
+        operation.setViewName("operation");
+        return operation;
     }
 
     //断点续传工具接口
@@ -120,6 +136,7 @@ public class DataContainerController {
                                  @RequestParam("userId")String userName,
                                  @RequestParam("serverNode")String serverNode,
                                  @RequestParam("origination")String origination) throws IOException, DocumentException {
+        String apiType = "configData";
         JsonResult jsonResult = new JsonResult();
         Date start = new Date();
         log.info("start time is " + start);
@@ -228,13 +245,14 @@ public class DataContainerController {
                         log.info(dataTemplate);
                     }
                     //首先判断文件个数,一个文件也压缩上传
-                    loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist);
+                    loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist,apiType);
                     break;
                 }
             }
             if (!config){
                 //有多个文件，但不含有配置文件
                 jsonResult.setCode(-1);
+                jsonResult.setResult("err");
                 jsonResult.setMessage("No config file");
                 return jsonResult;
             }
@@ -261,7 +279,8 @@ public class DataContainerController {
             bulkDataLinkDao.save(bulkDataLink);
 
             jsonResult.setCode(1);
-            jsonResult.setMessage("success");
+            jsonResult.setMessage("upload file success!");
+            jsonResult.setResult("suc");
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("source_store_id",uuid);
             jsonObject.put("file_name",uploadName);
@@ -272,34 +291,48 @@ public class DataContainerController {
         return jsonResult;
     }
 
-    //接口2 下载数据
+    /**
+     * 下载数据
+     * @param uid 数据uid
+     * @param type 是下载还是展示，如果为null直接下载，如果为html，则header设置为html
+     * @param response response
+     * @throws UnsupportedEncodingException 异常处理
+     */
     @RequestMapping(value = "/data/{uid}", method = RequestMethod.GET)
-    public void downLoadFile(@PathVariable String uid, HttpServletResponse response) throws UnsupportedEncodingException {
+    public void downLoadFile(@PathVariable String uid, @RequestParam(value = "type", required = false)String type,
+                             HttpServletResponse response) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         String oid = uid;
-        downLoadLog = dataContainer.downLoad(oid,response);
+        downLoadLog = dataContainer.downLoad(oid,response, type);
     }
+
+//    /**
+//     * 展示html，而不是下载
+//     * @param uid 数据下载id
+//     * @param response response
+//     */
+//    @RequestMapping(value = "/data/{uid}", method = RequestMethod.GET)
+//    public void showHTMLFile(@PathVariable String uid, @RequestParam(value = "type") String type, HttpServletResponse response){
+//        log.info(uid);
+//        log.info(type);
+//    }
 
     //接口3 删除指定上传数据
     @RequestMapping(value = "/data/{uid}", method = RequestMethod.DELETE)
     public JsonResult del(@PathVariable String uid){
         JsonResult jsonResult = new JsonResult();
         String oid = uid;
-        boolean delLog = false;
+//        boolean delLog = false;
 
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
-        delLog = dataContainer.delete(oid);
-        if (delLog){
-            jsonResult.setResult("suc");
-            jsonResult.setCode(1);
-            jsonResult.setData("");
-            jsonResult.setMessage("delete success");
-        }else {
-            jsonResult.setResult("err");
-            jsonResult.setCode(-1);
-            jsonResult.setData("");
-            jsonResult.setMessage("delete fail");
-        }
+        jsonResult = dataContainer.delete(oid, jsonResult);
+//        if (jsonResult.getCode() == 0){
+//        }else {
+//
+//            jsonResult.setCode(-1);
+//            jsonResult.setData("");
+//            jsonResult.setMessage("delete file fail");
+//        }
         return jsonResult;
     }
 
@@ -350,6 +383,7 @@ public class DataContainerController {
                 jsonResult.setMessage("downLoad success but delete cache file fail");
             }else {
                 jsonResult.setCode(1);
+                jsonResult.setResult("suc");
                 jsonResult.setMessage("downLoad success");
             }
         }else {
@@ -366,17 +400,17 @@ public class DataContainerController {
         JsonResult jsonResult = new JsonResult();
         boolean delLog = false;
         for (int i=0;i<oids.size();i++) {
-            delLog = dataContainer.delete(oids.get(i));
-            if (!delLog) {
+            jsonResult = dataContainer.delete(oids.get(i), jsonResult);
+            if (jsonResult.getCode() == -1) {
                 BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oids.get(i));
                 String failName = bulkDataLink.getName();
                 jsonResult.setCode(-1);
                 jsonResult.setResult("err");
-                jsonResult.setMessage(failName + "delete fail");
+                jsonResult.setMessage(failName + "delete fail," + jsonResult.getMessage());
                 return jsonResult;
             }
         }
-        if (delLog){
+        if (jsonResult.getCode() == 1){
             jsonResult.setCode(1);
             jsonResult.setResult("suc");
             jsonResult.setMessage("All file delete success");
@@ -393,6 +427,7 @@ public class DataContainerController {
                                  @RequestParam(value = "origination", required = false)String origination,
                                      @RequestParam(value = "datatag", required = false) String datatag) throws IOException {
         JsonResult jsonResult = new JsonResult();
+        String apiType = "data";
         boolean loadFileLog = false;
         boolean configExist = false;
         Date now = new Date();
@@ -410,7 +445,7 @@ public class DataContainerController {
         if (files.length==0){
             loadFileLog = false;
         }else{
-            loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist);
+            loadFileLog = dataContainer.uploadOGMSMulti(bulkDataLink,ogmsPath,uuid,files,configExist, apiType);
         }
         if (loadFileLog){
             //信息入库
@@ -425,7 +460,8 @@ public class DataContainerController {
             bulkDataLinkDao.save(bulkDataLink);
 
             jsonResult.setCode(1);
-            jsonResult.setMessage("success");
+            jsonResult.setResult("suc");
+            jsonResult.setMessage("upload file success!");
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("id",uuid);
             jsonObject.put("file_name",uploadName);
@@ -436,7 +472,8 @@ public class DataContainerController {
 
     //可视化接口
     @RequestMapping(value = "/data/{uid}/preview", method = RequestMethod.GET)
-    public void visual(@PathVariable(value = "uid") String uid,HttpServletResponse response) throws Exception {
+    public void visual(@PathVariable(value = "uid") String uid,HttpServletResponse response,
+                       @RequestParam(value = "type", required = false) String type) throws Exception {
         String oid = uid;
         File picCache = new File(visualPath + "/" + oid + ".png");
         if (!picCache.exists()) {
@@ -466,17 +503,16 @@ public class DataContainerController {
             log.info("已取得后缀，确定可视化类型，过");
 
 //        String picId = UUID.randomUUID().toString();
-            String outPath = "E:\\upload\\picCache" + "\\" + oid;//dev
-//            String outPath = "/data/picCache" + "/" + oid;//prod
+//            String outPath = "E:\\upload\\picCache" + "\\" + oid;//dev
+            String outPath = "/data/picCache" + "/" + oid;//prod
             if (visualType.equals("shp")) {
                 //调用shp可视化方法
                 try {
-                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//dev
-//                    String[] args = new String[]{"python", "/data/visualMethods/shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
+//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\shpSnapshot.py", String.valueOf(path), outPath};//dev
+                    String[] args = new String[]{"python", "/data/visualMethods/shpSnapshot.py", String.valueOf(path), String.valueOf(outPath)};//prod
                     log.info("input: " + path + "output: " + outPath);
 
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
-                    log.info("成功执行shp处理文件，pass");
 
                     BufferedReader in = new BufferedReader(new InputStreamReader(proc.getInputStream()));
                     String line = null;
@@ -485,6 +521,7 @@ public class DataContainerController {
                     }
                     in.close();
                     proc.waitFor();
+                    log.info("成功执行shp处理文件，pass");
                 } catch (IOException e) {
                     e.printStackTrace();
                 } catch (InterruptedException e) {
@@ -493,8 +530,8 @@ public class DataContainerController {
             } else if (visualType.equals("tiff")) {
                 //调用tiff可视化方法
                 try {
-                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};//dev
-//                    String[] args = new String[]{"python", "/data/visualMethods/tiff.py", String.valueOf(path), String.valueOf(oid)};//prod
+//                    String[] args = new String[]{"python", "E:\\upload\\upload_ogms\\tiff.py", String.valueOf(path), String.valueOf(oid)};//dev
+                    String[] args = new String[]{"python", "/data/visualMethods/tiff.py", String.valueOf(path), String.valueOf(oid)};//prod
 
                     Process proc = Runtime.getRuntime().exec(args);// 执行py文件
                     log.info("成功执行tiff处理文件，pass");
@@ -516,12 +553,12 @@ public class DataContainerController {
             dataContainer.deleteZipUncompress(zipFile, zipPath);
             log.info("删除解压后的文件成功，pass");
             File picFile = new File(visualPath + "/" + oid + ".png");
-            dataContainer.downLoadFile(response, picFile, oid + ".png");
+            dataContainer.downLoadFile(response, picFile, oid + ".png",type);
             log.info("首次下载成功");
         }else {
             //将生成的文件进行下载
             File picFile = new File(visualPath + "/" + oid + ".png");
-            dataContainer.downLoadFile(response, picFile, oid + ".png");
+            dataContainer.downLoadFile(response, picFile, oid + ".png", type);
             log.info("取得缓存下载成功");
         }
     }
@@ -535,6 +572,9 @@ public class DataContainerController {
         visualCategory.setCategory(category);
         visualCategory.setOid(oid);
         visualCategoryDao.save(visualCategory);
+        jsonResult.setResult("suc");
+        jsonResult.setMessage("add visual method success!");
+        jsonResult.setCode(1);
         return jsonResult;
     }
 
@@ -632,6 +672,7 @@ public class DataContainerController {
             bulkDataLink.setDataListComs(dataListComs);
             jsonResult.setCode(1);
             jsonResult.setMessage("success");
+            jsonResult.setResult("suc");
             jsonResult.setData(bulkDataLink);
             return jsonResult;
         }
@@ -655,6 +696,7 @@ public class DataContainerController {
     //大文件下载
     @RequestMapping(value = "/downloadBigFile", method = RequestMethod.GET)
     public JsonResult downloadBigFile(@RequestParam(value = "fileName") String fileName,
+                                      @RequestParam(value = "type", required = false) String type,
                                       HttpServletResponse response) throws UnsupportedEncodingException {
         JsonResult result = new JsonResult();
         String hostname = "192.168.47.130";
@@ -675,11 +717,219 @@ public class DataContainerController {
             result.setResult("err");
             return result;
         }
-        dataContainer.downLoadFile(response, file, fileName);
+        dataContainer.downLoadFile(response, file, fileName,type);
 
 
         downloadFile(hostname, port, username, password, pathName, fileName, localpath);
 
         return result;
     }
+
+//    @RequestMapping(value = "/getPortal", method = RequestMethod.GET)
+//    public JsonResult getPortal(){
+//        JsonResult jsonResult = new JsonResult();
+//
+//        //拿到门户用户数据id
+//        List<String> urls = new ArrayList<>();
+//        List<User> users = userDao.findAll();
+//        for (User user:users){
+//            List<FileMeta> fileMetas = user.getFileContainer();
+//            if (fileMetas == null){
+//                continue;
+//            }else {
+//                for(FileMeta fileMeta:fileMetas){
+//                    if (fileMeta.getUrl().equals("")||fileMeta.getUrl() == null){
+//                        continue;
+//                    }else {
+////                        String oid = fileMeta.getUrl().split("=")[1];
+//                        urls.add(fileMeta.getUrl());
+//                    }
+//                }
+//            }
+//        }
+//
+//        jsonResult.setData(urls);
+//        return jsonResult;
+//    }
+//
+//    @RequestMapping(value = "/getTask", method = RequestMethod.GET)
+//    public JsonResult getTask(){
+//        JsonResult jsonResult = new JsonResult();
+//
+//        //拿到门户用户数据id
+//        List<String> urls = new ArrayList<>();
+//        List<Task> tasks = taskDao.findAll();
+//        HashSet<String> userId = new HashSet<>();
+////        for (Task task : tasks){
+////            if(task.getStatus() == 2){
+////                userId.add(task.getUserId());
+////            }
+////        }
+//        for (Task task : tasks){
+//            if(task.getStatus() == 2&&(task.getUserId().equals("wxsh@cugb.edu.cn")||task.getUserId().equals("641597542@qq.com")
+//                    ||task.getUserId().equals("786872808@qq.com")||task.getUserId().equals("chenmin")
+//                    ||task.getUserId().equals("wutingxin1998@gmail.com")||task.getUserId().equals("1061401953@qq.com")
+//                    ||task.getUserId().equals("Xun Shi")||task.getUserId().equals("1245181489@qq.com")
+//                    ||task.getUserId().equals("hqsong@henu.edu.cn")||task.getUserId().equals("xinyue.ye@njit.edu")||
+//                    task.getUserId().equals("yuesongshan")||task.getUserId().equals("zhengzhong2020@qq.com")
+//                    ||task.getUserId().equals("wxc627684875")||task.getUserId().equals("chenmin0902@163.com")
+//                    ||task.getUserId().equals("songc@lreis.ac.cn")||task.getUserId().equals("473701638@qq.com")
+//                    ||task.getUserId().equals("307338820@qq.com")||task.getUserId().equals("1643696225@qq.com")
+//                    ||task.getUserId().equals("lihongyi@lzb.ac.cn")||task.getUserId().equals("Wtian@lzu.edu.cn"))){
+//                List<TaskData> inputs = task.getInputs();
+//                for (TaskData taskData : inputs){
+//                    urls.add(taskData.getUrl());
+//                }
+//            }else {
+//                continue;
+//            }
+//        }
+//
+//        jsonResult.setData(urls);
+//        return jsonResult;
+//    }
+
+    /**
+     * 将数据库字段有用的进行迁移
+     * @param oid 待迁移的BulkDataLink2的id
+     * @return 迁移结果
+     */
+    @RequestMapping(value = "/insertData/{oid}", method = RequestMethod.GET)
+    public JsonResult insertData(@PathVariable(value = "oid") String oid){
+        JsonResult jsonResult = new JsonResult();
+        BulkDataLink2 bulkDataLink2 = bulkDataLinkDao2.findFirstByZipOid(oid);
+        List<String> dataOids = bulkDataLink2.getDataOids();
+
+        bulkDataLinkDao.insert(bulkDataLink2);
+        for (String dataOid:dataOids){
+            DataListCom2 dataListCom2 = dataListComDao2.findFirstByOid(dataOid);
+            dataListCom2.setPath("/data/dataSource/upload_dataContainer/" + dataOid);
+            dataListComDao.insert(dataListCom2);
+        }
+
+        return jsonResult;
+    }
+
+//    /**
+//     *
+//     */
+    @RequestMapping(value = "/findComNameNone", method = RequestMethod.GET)
+    public ArrayList<String> findComNameNone(){
+        List<DataListCom> dataListComs = dataListComDao.findAll();
+        ArrayList<String> list = new ArrayList<>();
+        for (DataListCom dataListCom:dataListComs){
+            if(dataListCom.getFileName().equals("")){
+                list.add(dataListCom.getOid());
+                dataListComDao.delete(dataListCom);
+            }
+        }
+        return list;
+    }
+
+
+    /**
+     * 75容器中转接口，将75页面的数据存储到本服务器本地，将数据路径返回
+     * @param filesUrl 文件url
+     * @return 数据路径
+     */
+    @RequestMapping(value = "/dataDownloadContainer", method = RequestMethod.POST)
+    public JsonResult dataDownloadContainer(@RequestParam(value = "datafileUrl", required = false)String[] filesUrl) throws IOException {
+        JsonResult jsonResult = new JsonResult();
+        if(filesUrl.length < 1){
+            jsonResult.setMessage("url is none");
+            jsonResult.setCode(-1);
+            return jsonResult;
+        }
+        List<String> paths = new ArrayList<>();
+        String uuid = UUID.randomUUID().toString();
+        String dirPath = resourcePath + "/" + uuid;
+        for(int i=0;i<filesUrl.length;i++){
+            boolean isDownload = dataContainer.downloadContainer(filesUrl[i],dirPath);
+            if(!isDownload){
+                jsonResult.setCode(-1);
+                jsonResult.setMessage("download file failed");
+                return jsonResult;
+            }
+        }
+
+        jsonResult.setData(dirPath);
+        jsonResult.setCode(0);
+        return jsonResult;
+    }
+
+
+    @RequestMapping(value = "/dataDownloadAndCpmpress", method = RequestMethod.POST)
+    public JsonResult dataDownloadAndCpmpress(@RequestParam(value = "resources", required = false)MultipartFile[] files) throws Exception {
+        JsonResult jsonResult = new JsonResult();
+        String uuid = UUID.randomUUID().toString();
+        String destDirPath = resourcePath + "/" + uuid;
+        File testData = new File(destDirPath);
+        if(!testData.exists()){
+            testData.mkdirs();
+        }
+        String dirFilePath = destDirPath + "/res.zip";
+
+        File localFile = new File(dirFilePath);
+        FileOutputStream fos = null;
+        InputStream in = null;
+        try {
+            if (localFile.exists()) {
+                //如果文件存在删除文件
+                boolean delete = localFile.delete();
+            }
+            //创建文件
+            if (!localFile.exists()) {
+                //如果文件不存在，则创建新的文件
+                localFile.createNewFile();
+            }
+
+            //创建文件成功后，写入内容到文件里
+            fos = new FileOutputStream(localFile);
+            in = files[0].getInputStream();
+
+            byte[] bytes = new byte[1024];
+            int len = -1;
+            while ((len = in.read(bytes)) != -1) {
+                fos.write(bytes, 0, len);
+            }
+            fos.flush();
+            log.info("Reading uploaded file and buffering to local successfully!");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (fos != null) {
+                    fos.close();
+                }
+                if (in != null) {
+                    in.close();
+                }
+            }catch (IOException e) {
+                log.error("InputStream or OutputStream close error : {}", e);
+            }
+        }
+
+        //解压
+        dataContainer.zipUncompress(dirFilePath, destDirPath);
+        jsonResult.setData(destDirPath);
+        jsonResult.setCode(0);
+        jsonResult.setMessage("suc");
+        return jsonResult;
+    }
+
+    /**
+     * 75容器中转接口，将绑定好的数据删除
+     * @param filesUrl
+     * @return
+     */
+    @RequestMapping(value = "/dataDelete", method = RequestMethod.POST)
+    public JsonResult dataDelete(@RequestParam(value = "datafileUrl", required = false)String[] filesUrl) {
+        JsonResult jsonResult = new JsonResult();
+
+
+        return jsonResult;
+    }
+
 }

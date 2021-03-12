@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" media="screen" href="/static/element-ui/theme-chalk/index.css"/>
+</head>
+<body>
+<div id="app">
+    <div style="margin: 20px;"></div>
+    <el-form :label-position="labelPosition" label-width="80px" :model="formLabelAlign">
+        <el-form-item label="Input1">
+            <el-input v-model="formLabelAlign.input1" placeholder="C:\Test" style="width: 50%"></el-input>
+        </el-form-item>
+        <el-form-item label="Input2">
+            <el-input v-model="formLabelAlign.input2" placeholder="Please input the content1" style="width: 50%"></el-input>
+        </el-form-item>
+        <el-form-item label="Parameter">
+            <el-input v-model="formLabelAlign.parameter" placeholder="Please input the content1" style="width: 50%"></el-input>
+        </el-form-item>
+        <el-form-item label="Output">
+            <el-input v-model="formLabelAlign.output" placeholder="Please input the content1" style="width: 50%" :disabled="true"></el-input>
+        </el-form-item>
+    </el-form>
+    <el-button type="success" style="float: right">Invoke</el-button>
+</div>
+
+<!--<div id="app"><div style="margin: 20px;"></div> <form class="el-form el-form&#45;&#45;label-right"><div class="el-form-item"><label class="el-form-item__label" style="width: 80px;">input1</label><div class="el-form-item__content" style="margin-left: 80px;"><div class="el-input" style="width: 50%;">&lt;!&ndash;&ndash;&gt;<input type="text" autocomplete="off" placeholder="Please input the content1" class="el-input__inner">&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;</div>&lt;!&ndash;&ndash;&gt;</div></div> <div class="el-form-item"><label class="el-form-item__label" style="width: 80px;">input1</label><div class="el-form-item__content" style="margin-left: 80px;"><div class="el-input" style="width: 50%;">&lt;!&ndash;&ndash;&gt;<input type="text" autocomplete="off" placeholder="Please input the content1" class="el-input__inner">&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;</div>&lt;!&ndash;&ndash;&gt;</div></div> <div class="el-form-item"><label class="el-form-item__label" style="width: 80px;">parameter</label><div class="el-form-item__content" style="margin-left: 80px;"><div class="el-input" style="width: 50%;">&lt;!&ndash;&ndash;&gt;<input type="text" autocomplete="off" placeholder="Please input the content1" class="el-input__inner">&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;&lt;!&ndash;&ndash;&gt;</div>&lt;!&ndash;&ndash;&gt;</div></div></form></div>-->
+</body>
+<script src="/static/js/common/vue.min.js"></script>
+<script src="/static/element-ui/index.js"></script>
+<script src="/static/element-ui/umd/locale/en.js"></script>
+<script src="/static/js/page/operation.js"></script>
+
+</html>

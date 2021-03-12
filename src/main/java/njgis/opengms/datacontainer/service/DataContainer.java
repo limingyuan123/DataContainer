@@ -9,6 +9,7 @@ import njgis.opengms.datacontainer.dao.ReferenceZeroTimeDao;
 import njgis.opengms.datacontainer.entity.BulkDataLink;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.ReferenceZeroTime;
+import njgis.opengms.datacontainer.enums.ContentTypeEnum;
 import njgis.opengms.datacontainer.thread.BPContinueThread;
 import njgis.opengms.datacontainer.thread.MergeRunnable;
 import njgis.opengms.datacontainer.thread.SplitRunnable;
@@ -21,9 +22,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
+import sun.security.timestamp.TSRequest;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
@@ -59,7 +63,7 @@ public class DataContainer {
     //计数器，主要用来完成缓存文件删除
     private CountDownLatch latch = null;
 
-    public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist)
+    public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist, String apiType)
             throws IOException {
         BufferedInputStream bis = null;
         ZipOutputStream zos = null;
@@ -77,7 +81,7 @@ public class DataContainer {
             byte[] bufs = new byte[1024 * 10];
 
 
-            //如果为多个，则将上传的文件进行压缩，之后进行上传，配置文件不压缩
+            //如果为多个，则将上传的文件进行压缩，之后进行上传，配置文件不压缩,但是data接口的所有文件均压缩
             for (int i = 0; i < files.length; i++) {
                 //有些上传文件无后缀，筛选无后缀文件
                 boolean isMatchSuffix = files[i].getOriginalFilename().contains(".");
@@ -88,7 +92,7 @@ public class DataContainer {
                     //获得文件后缀名
                     String a = files[i].getOriginalFilename().substring(begin, last);
                     //如文件为配置文件，则不压缩
-                    if (a.endsWith(".udxcfg")) {
+                    if (a.endsWith(".udxcfg")&&apiType.equals("configData")) {
                         break;
                     }
                 }
@@ -251,7 +255,7 @@ public class DataContainer {
     }
 
     //文件下载
-    public boolean downLoad(String oid, HttpServletResponse response) throws UnsupportedEncodingException {
+    public boolean downLoad(String oid, HttpServletResponse response, String type) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
         if (bulkDataLink == null){
@@ -265,7 +269,7 @@ public class DataContainer {
                 File file = new File(fileSingle);
                 String fileName = dataListCom.getFileName();
                 if (file.exists()){
-                    downLoadLog = downLoadFile(response, file, fileName);
+                    downLoadLog = downLoadFile(response, file, fileName, type);
                 }
             }
         }else {
@@ -277,17 +281,24 @@ public class DataContainer {
                 String fileSingle = dataListCom.getPath() + "/" + dataListCom.getFileName();
                 File file = new File(fileSingle);
                 String suffix = fileSingle.substring(fileSingle.lastIndexOf(".") + 1);
-                String fileName = bulkDataLink.getName() + "." + suffix;//下载时的文件名称,门户，下载的名字为前端定义的，不是真名
+                //下载时的文件名称,门户，下载的名字为前端定义的，不是真名//如果该名称不存在，命名为result
+                String fileName = null;
+                if(bulkDataLink.getName() == null){
+                    fileName = "result." + suffix;
+                }else {
+                    fileName = bulkDataLink.getName() + "." + suffix;
+                }
+
 //            String fileName = dataListCom.getFileName();//下载时的文件名称,为文件真名，需要时取消注释
                 if (file.exists()) {
-                    downLoadLog = downLoadFile(response, file, fileName);
+                    downLoadLog = downLoadFile(response, file, fileName,type);
                 }
             } else {
                 String fileZip = bulkDataLink.getZipOid() + ".zip";
                 String fileName = bulkDataLink.getName() + ".zip";
                 File file = new File(downLoadPath + "/" + fileZip);
                 if (file.exists()) {
-                    downLoadLog = downLoadFile(response, file, fileName);
+                    downLoadLog = downLoadFile(response, file, fileName, type);
                 }
             }
         }
@@ -295,14 +306,19 @@ public class DataContainer {
     }
 
     //参数为需要下载的文件路径下的文件、下载用的文件名以及response
-    public boolean downLoadFile(HttpServletResponse response, File file, String fileName) throws UnsupportedEncodingException {
+    public boolean downLoadFile(HttpServletResponse response, File file, String fileName, String type) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         log.info("文件大小" + file.length());
+        if(type!=null){
+            String contentType = ContentTypeEnum.getContentTypeByName(type).getText();
+            response.setContentType(contentType);
+        }else {
+            response.setContentType("application/force-download");
+            response.addHeader("Content-Disposition", "attachment;fileName=" + new String(fileName.getBytes(StandardCharsets.UTF_8),
+                    "ISO8859-1"));
+            response.setContentLength((int) file.length());
+        }
 
-        response.setContentType("application/force-download");
-        response.setContentLength((int) file.length());
-        response.addHeader("Content-Disposition", "attachment;fileName=" + new String(fileName.getBytes(StandardCharsets.UTF_8),
-                "ISO8859-1"));
         byte[] buffer = new byte[1024];
         FileInputStream fis = null;
         BufferedInputStream bis = null;
@@ -433,10 +449,16 @@ public class DataContainer {
     }
 
     //文件删除操作
-    public boolean delete(String oid){
-        boolean delLog = false;
+    public JsonResult delete(String oid, JsonResult jsonResult){
+//        boolean delLog = false;
 
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
+        if(bulkDataLink == null){
+            jsonResult.setCode(-1);
+            jsonResult.setResult("err");
+            jsonResult.setMessage("file not exist");
+            return jsonResult;
+        }
         //删除文件夹或文件,如删除批量上传的文件，则所有文件的文件夹也删除
 //        for (int i=0;i<bulkDataLink.getDataOids().size();i++){
 //            DataListCom dataListCom = dataListComDao.findFirstByOid(bulkDataLink.getDataOids().get(i));
@@ -447,6 +469,12 @@ public class DataContainer {
 
         for (int i=0;i<bulkDataLink.getDataOids().size();i++){
             DataListCom dataListCom = dataListComDao.findFirstByOid(bulkDataLink.getDataOids().get(i));
+            if(dataListCom == null){
+                jsonResult.setCode(-1);
+                jsonResult.setMessage("(dataListCom) Source file not found");
+                jsonResult.setResult("err");
+                return jsonResult;
+            }
             if (dataListCom.getReferenceCount()>0) {
                 referenceCountMinusMinus(dataListCom.getOid());
                 DataListCom dataListCom1 = dataListComDao.findFirstByOid(bulkDataLink.getDataOids().get(i));
@@ -459,22 +487,37 @@ public class DataContainer {
                     referenceZeroTimeDao.save(referenceZeroTime);
                 }
             }else if (dataListCom.getReferenceCount()<=0){
-                delLog = false;
-                return delLog;//考虑到引用系数已经为0还要删除的情况
+                //考虑到引用系数已经为0还要删除的情况
+                jsonResult.setCode(-1);
+                jsonResult.setResult("err");
+                jsonResult.setMessage("The file reference coefficient is 0 and cannot be deleted");
+                return jsonResult;
+//                delLog = false;
+//                return delLog;
             }
         }
         //dataOids文件夹删除后删除zip文件夹
         String delPath = bulkDataLink.getPath();
-        delLog = deleteFolder(delPath);
+//         delLog = ;
 
-        if (delLog){
+        if (deleteFolder(delPath)){
             //删除对应的数据库内容
             if (bulkDataLink!=null) {
                 bulkDataLinkDao.delete(bulkDataLink);
             }
+            jsonResult.setResult("suc");
+            jsonResult.setCode(1);
+            jsonResult.setData("");
+            jsonResult.setMessage("delete file success");
+            return jsonResult;
+        }else {
+            jsonResult.setResult("err");
+            jsonResult.setCode(-1);
+            jsonResult.setMessage("failed to delete zip folder");
+            return jsonResult;
         }
 
-        return delLog;
+//        return delLog;
     }
 
     //根据路径删除指定的目录或文件，无论存在与否
@@ -828,4 +871,77 @@ public class DataContainer {
     }
 
 
+    /**
+     * 下载数据到dirPath中
+     * @param dataUrl 待下载数据url
+     * @param destDirPath 下载数据至的文件夹
+     * @return 下载是否成功
+     */
+    public Boolean downloadContainer(String dataUrl, String destDirPath) throws IOException {
+        String filePath = null;
+        boolean isDownload = false;
+        InputStream inputStream = null;
+        FileOutputStream fileOutputStream = null;
+        String fileName = null;
+        if (dataUrl!=null){
+            URL url = new URL(dataUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(60000);
+            //通过conn取得文件名称
+            String raw = conn.getHeaderField("Content-Disposition");
+            if(raw!=null&&raw.indexOf("=")>0){
+                fileName = raw.split("=")[1];
+                fileName = new String(fileName.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+            }
+            inputStream = conn.getInputStream();
+        }
+
+        File testData = new File(destDirPath);
+        if(!testData.exists()){
+            testData.mkdirs();
+        }
+        String path = destDirPath + "/" + fileName ;
+        File localFile = new File(path);
+        try {
+            //将数据下载至resourcePath下
+            if (localFile.exists()) {
+                //如果文件存在删除文件
+                boolean delete = localFile.delete();
+            }
+            //创建文件
+            if (!localFile.exists()) {
+                //如果文件不存在，则创建新的文件
+                localFile.createNewFile();
+            }
+
+            fileOutputStream = new FileOutputStream(localFile);
+            byte[] bytes = new byte[1024];
+            int len = -1;
+            while ((len = inputStream.read(bytes)) != -1) {
+                fileOutputStream.write(bytes, 0, len);
+            }
+            fileOutputStream.close();
+            inputStream.close();
+            isDownload = true;
+
+        } catch (FileNotFoundException e){
+            e.printStackTrace();
+        }catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (fileOutputStream != null) {
+                    fileOutputStream.close();
+                }
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+            }catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return isDownload;
+    }
 }

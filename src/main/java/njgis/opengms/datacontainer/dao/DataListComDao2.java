@@ -4,14 +4,10 @@ import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.DataListCom2;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
-
 /**
  * @Author mingyuan
- * @Date 2020.07.08 14:08
+ * @Date 2020.12.21 16:39
  */
-public interface DataListComDao extends MongoRepository<DataListCom, String> {
-    DataListCom findFirstByOid(String oid);
-
-    void insert(DataListCom2 dataListCom2);
+public interface DataListComDao2 extends MongoRepository<DataListCom2, String> {
+    DataListCom2 findFirstByOid(String oid);
 }

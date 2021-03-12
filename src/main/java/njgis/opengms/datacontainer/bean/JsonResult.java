@@ -19,7 +19,7 @@ public class JsonResult<T> implements Serializable {
     private static final long serialVersionUID = 1L;//JAVA序列化的机制是通过判断类的serialVersionUID来验证的版本一致的
 
     private Integer code=0;
-    private String message="success";
+    private String message="";
     private T data;
-    private String result = "suc";
+    private String result = "";
 }
