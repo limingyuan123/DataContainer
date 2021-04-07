@@ -63,6 +63,17 @@ public class DataContainer {
     //计数器，主要用来完成缓存文件删除
     private CountDownLatch latch = null;
 
+    /**
+     * 多文件打包上传
+     * @param bulkDataLink bulkDataLink
+     * @param ogmsPath ogmsPath
+     * @param uuid uuid
+     * @param files files
+     * @param configExist configExist
+     * @param apiType apiType
+     * @return 上传结果
+     * @throws IOException 异常处理
+     */
     public boolean uploadOGMSMulti(BulkDataLink bulkDataLink,String ogmsPath, String uuid, MultipartFile[] files,Boolean configExist, String apiType)
             throws IOException {
         BufferedInputStream bis = null;
@@ -141,7 +152,14 @@ public class DataContainer {
         return true;
     }
 
-    //将每个文件分开存储并存储oid
+    /**
+     * 将每个文件分开存储并存储oid
+     * @param bulkDataLink bulkDataLink
+     * @param files files
+     * @param configExist configExist
+     * @return 结果
+     * @throws IOException 异常处理
+     */
     public boolean uploadOGMSData(BulkDataLink bulkDataLink, MultipartFile[] files,Boolean configExist) throws IOException {
         List<String> dataOids = new LinkedList<>();
         int fileLength;
@@ -254,7 +272,14 @@ public class DataContainer {
         return true;
     }
 
-    //文件下载
+    /**
+     * 文件下载
+     * @param oid oid
+     * @param response response
+     * @param type type
+     * @return 下载结果
+     * @throws UnsupportedEncodingException 异常处理
+     */
     public boolean downLoad(String oid, HttpServletResponse response, String type) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
@@ -305,7 +330,15 @@ public class DataContainer {
         return downLoadLog;
     }
 
-    //参数为需要下载的文件路径下的文件、下载用的文件名以及response
+    /**
+     * 文件下载函数，参数为需要下载的文件路径下的文件、下载用的文件名以及response
+     * @param response response
+     * @param file file
+     * @param fileName fileName
+     * @param type type
+     * @return 结果
+     * @throws UnsupportedEncodingException 异常处理
+     */
     public boolean downLoadFile(HttpServletResponse response, File file, String fileName, String type) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         log.info("文件大小" + file.length());
@@ -354,7 +387,13 @@ public class DataContainer {
         return downLoadLog;
     }
 
-    //文件批量下载
+    /**
+     * 文件批量下载函数
+     * @param response response
+     * @param files files
+     * @return 结果
+     * @throws UnsupportedEncodingException 异常处理
+     */
     public JsonResult downLoadBulkFile(HttpServletResponse response, File[] files) throws UnsupportedEncodingException {
         boolean downLoadLog = false;
         JsonResult jsonResult = new JsonResult();
@@ -448,7 +487,12 @@ public class DataContainer {
         return jsonResult;
     }
 
-    //文件删除操作
+    /**
+     * 文件删除操作
+     * @param oid oid
+     * @param jsonResult jsonResult
+     * @return 删除结果
+     */
     public JsonResult delete(String oid, JsonResult jsonResult){
 //        boolean delLog = false;
 
@@ -520,7 +564,11 @@ public class DataContainer {
 //        return delLog;
     }
 
-    //根据路径删除指定的目录或文件，无论存在与否
+    /**
+     * 根据路径删除指定的目录或文件，无论存在与否
+     * @param sPath sPath
+     * @return 删除结果
+     */
     public boolean deleteFolder(String sPath) {
         boolean delLog = false;
 
@@ -538,7 +586,11 @@ public class DataContainer {
         }
     }
 
-     //删除单个文件
+    /**
+     * 删除单个文件
+     * @param sPath sPath
+     * @return 结果
+     */
     public boolean deleteFile(String sPath) {
         boolean delLog;
         delLog = false;
@@ -551,7 +603,11 @@ public class DataContainer {
         return delLog;
     }
 
-    //删除目录（文件夹）以及目录下的文件
+    /**
+     * 删除目录（文件夹）以及目录下的文件
+     * @param sPath sPath
+     * @return 结果
+     */
     public boolean deleteDirectory(String sPath) {
         boolean delLog;
         //如果sPath不以文件分隔符结尾，自动添加文件分隔符
@@ -586,7 +642,10 @@ public class DataContainer {
         }
     }
 
-    //引用计数++
+    /**
+     * 引用计数++
+     * @param oid oid
+     */
     public void referenceCountPlusPlus(String oid){
         DataListCom dataListCom = dataListComDao.findFirstByOid(oid);
         int count = dataListCom.getReferenceCount() + 1;
@@ -594,7 +653,10 @@ public class DataContainer {
         dataListComDao.save(dataListCom);
     }
 
-    //引用计数--
+    /**
+     * 引用计数--
+     * @param oid oid
+     */
     public void referenceCountMinusMinus(String oid){
         DataListCom dataListCom = dataListComDao.findFirstByOid(oid);
         int count = dataListCom.getReferenceCount() - 1;
@@ -602,8 +664,9 @@ public class DataContainer {
         dataListComDao.save(dataListCom);
     }
 
-    //对md5值为0且为0时间超30天的文件进行删除
-    //先测试5秒钟的
+    /**
+     * 对md5值为0且为0时间超30天的文件进行删除，先测试5秒钟的
+     */
     @Scheduled(cron = "*/5 * * * * ?")
     //部署时解开，每月一号凌晨一点
 //    @Scheduled(cron = "0 0 1 1 * ?")
@@ -644,7 +707,12 @@ public class DataContainer {
         return delLog;
     }
 
-    //解压文件
+    /**
+     * 解压文件
+     * @param inputFile inputFile
+     * @param destDirPath destDirPath
+     * @throws Exception 异常处理
+     */
     public void zipUncompress(String inputFile,String destDirPath) throws Exception {
         File srcFile = new File(inputFile);
         if (!srcFile.exists()){
@@ -684,7 +752,12 @@ public class DataContainer {
         zipFile.close();
     }
 
-    ////执行python脚本之后删除解压后的文件
+    /**
+     * 执行python脚本之后删除解压后的文件
+     * @param zipFile zipFile
+     * @param zipPath zipPath
+     * @return 结果
+     */
     public Boolean deleteZipUncompress(String zipFile,String zipPath){
         boolean delLog = false;
         File zipFilePath = new File(zipPath);
@@ -708,7 +781,11 @@ public class DataContainer {
         return delLog;
     }
 
-    //截取路径/\后的元素
+    /**
+     * 截取路径/\后的元素
+     * @param input input
+     * @return 结果
+     */
     public String intercept(String input){
         int index = input.lastIndexOf("\\");
         int index1 = input.lastIndexOf("/");
@@ -719,7 +796,15 @@ public class DataContainer {
         }
     }
 
-    //断点续传
+    /**
+     * 断点续传
+     * @param oid oid
+     * @param savePath savePath
+     * @param response response
+     * @return 结果
+     * @throws InterruptedException 异常处理
+     * @throws IOException 异常处理
+     */
     public Boolean downBPContinue(String oid,String savePath, HttpServletResponse response) throws InterruptedException, IOException {
         boolean downLoadLog = false;
         File downFile = null;
@@ -749,13 +834,6 @@ public class DataContainer {
         long[] endPos = new long[threadNum];//保存每个线程下载数据的截至位置
         long blockFileSize = fileLength%threadNum == 0?fileLength/threadNum:fileLength/threadNum+1;
         log.info("blockSize: " + blockFileSize + " fileLength: " + fileLength);
-//        splitBySize(fileName, (int) blockFileSize);
-
-        //等待分割结束
-//        Thread.sleep(10000);
-//        mergePartFiles(fileLength,bulkDataLink.getPath(),".part", (int) blockFileSize,FileUtil.currentWorkDir + "new.zip");
-
-//        String ranTmpFileName = bpFileName + ".random";
 
 
         latch = new CountDownLatch(threadNum);
@@ -784,6 +862,15 @@ public class DataContainer {
         return downLoadLog;
     }
 
+    /**
+     * 设置断点续传断点
+     * @param startPos startPos
+     * @param endPos endPos
+     * @param threadNum threadNum
+     * @param blockFileSize blockFileSize
+     * @param tmpFile tmpFile
+     * @param fileLength fileLength
+     */
     private void setBreakPoint(long[] startPos,long[] endPos, int threadNum, long blockFileSize, File tmpFile, long fileLength){
         RandomAccessFile ranTmpFile = null;
         try {
@@ -835,7 +922,12 @@ public class DataContainer {
 
     }
 
-    //分割文件
+    /**
+     * 分割文件
+     * @param fileName fileName
+     * @param byteSize byteSize
+     * @return 分割结果
+     */
     public List<String> splitBySize(String fileName, int byteSize) {
         List<String> parts = new ArrayList<String>();
         File file = new File(fileName);
@@ -853,7 +945,15 @@ public class DataContainer {
         return parts;
     }
 
-    //合并文件
+    /**
+     * 合并文件
+     * @param fileLength fileLength
+     * @param dirPath dirPath
+     * @param partFileSuffix partFileSuffix
+     * @param partFileSize partFileSize
+     * @param mergeFileName mergeFileName
+     * @throws IOException 异常处理
+     */
     public void mergePartFiles(long fileLength, String dirPath, String partFileSuffix, int partFileSize, String mergeFileName) throws IOException {
         ArrayList<File> partFiles = FileUtil.getDirFiles(dirPath,partFileSuffix);
         Collections.sort(partFiles, new FileUtil.FileComparator());

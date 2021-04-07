@@ -67,22 +67,16 @@ public class DataContainerController {
     @Autowired
     FtpConfig ftpConfig;
 
-//    @Autowired
-//    UserDao userDao;
-//
-//    @Autowired
-//    TaskDao taskDao;
-
-//    @Autowired
-//    UploadThread uploadThread;
-
     @Value("${resourcePath}")
     private String resourcePath;
 
     @Value("${visualPath}")
     private String visualPath;
 
-    //upload网页
+    /**
+     * 测试页面，测试上传
+     * @return 后台渲染页面
+     */
     @RequestMapping("/testUpload")
     public ModelAndView testUpload() {
         ModelAndView testUpload = new ModelAndView();
@@ -90,6 +84,10 @@ public class DataContainerController {
         return testUpload;
     }
 
+    /**
+     * 泛在静态页面
+     * @return 静态页面
+     */
     @RequestMapping("/operation")
     public ModelAndView operation(){
         ModelAndView operation = new ModelAndView();
@@ -97,7 +95,10 @@ public class DataContainerController {
         return operation;
     }
 
-    //断点续传工具接口
+    /**
+     * 断点续传工具页面，已无用
+     * @return 静态页面
+     */
     @RequestMapping("/BPContinue")
     public ModelAndView BPContinue(){
         ModelAndView BPContinue = new ModelAndView();
@@ -105,7 +106,11 @@ public class DataContainerController {
         return BPContinue;
     }
 
-    //test接口
+    /**
+     * 测试图片上传
+     * @param img img信息
+     * @return 上传结果
+     */
     @RequestMapping(value = "/uploadImg", method = RequestMethod.POST)
     public JsonResult  uploadImg(@RequestBody String img){
         Image image = new Image();
@@ -129,7 +134,17 @@ public class DataContainerController {
         return jsonResult;
     }
 
-    //接口1改进 批量上传ogms数据并分开存储  含配置文件类
+    /**
+     * 接口1改进 批量上传ogms数据并分开存储  含配置文件类
+     * @param files 待传文件，以及包含了配置文件
+     * @param uploadName 文件名
+     * @param userName 用户名
+     * @param serverNode 服务节点
+     * @param origination 组织
+     * @return 上传结果信息，含有上传文件的oid信息
+     * @throws IOException 异常处理
+     * @throws DocumentException 异常处理
+     */
     @RequestMapping(value = "/configData", method = RequestMethod.POST)
     public JsonResult uploadData(@RequestParam("datafile")MultipartFile[] files,
                                  @RequestParam("name")String uploadName,
@@ -295,7 +310,7 @@ public class DataContainerController {
      * 下载数据
      * @param uid 数据uid
      * @param type 是下载还是展示，如果为null直接下载，如果为html，则header设置为html
-     * @param response response
+     * @param response 下载的文件
      * @throws UnsupportedEncodingException 异常处理
      */
     @RequestMapping(value = "/data/{uid}", method = RequestMethod.GET)
@@ -306,37 +321,26 @@ public class DataContainerController {
         downLoadLog = dataContainer.downLoad(oid,response, type);
     }
 
-//    /**
-//     * 展示html，而不是下载
-//     * @param uid 数据下载id
-//     * @param response response
-//     */
-//    @RequestMapping(value = "/data/{uid}", method = RequestMethod.GET)
-//    public void showHTMLFile(@PathVariable String uid, @RequestParam(value = "type") String type, HttpServletResponse response){
-//        log.info(uid);
-//        log.info(type);
-//    }
-
-    //接口3 删除指定上传数据
+    /**
+     * 删除指定上传数据
+     * @param uid 待删数据uid
+     * @return 删除结果
+     */
     @RequestMapping(value = "/data/{uid}", method = RequestMethod.DELETE)
     public JsonResult del(@PathVariable String uid){
         JsonResult jsonResult = new JsonResult();
         String oid = uid;
-//        boolean delLog = false;
-
         BulkDataLink bulkDataLink = bulkDataLinkDao.findFirstByZipOid(oid);
         jsonResult = dataContainer.delete(oid, jsonResult);
-//        if (jsonResult.getCode() == 0){
-//        }else {
-//
-//            jsonResult.setCode(-1);
-//            jsonResult.setData("");
-//            jsonResult.setMessage("delete file fail");
-//        }
         return jsonResult;
     }
 
-    //接口4 批量下载
+    /**
+     * 批量下载
+     * @param oids 批量的数据oid，用oid是因为容器历史问题，可以根据条件进行优化，与文档同步进行
+     * @param response 下载结果，一般为zip文件
+     * @throws UnsupportedEncodingException 异常处理
+     */
     @RequestMapping(value = "/batchData",method = RequestMethod.GET)
     public void bulkDownLoad(@RequestParam(value = "oids") List<String> oids, HttpServletResponse response)
             throws UnsupportedEncodingException {
@@ -394,7 +398,11 @@ public class DataContainerController {
         return;
     }
 
-    //接口5 批量删除
+    /**
+     * 批量删除
+     * @param oids 待批量删除的文件的多个oid
+     * @return 批量删除结果
+     */
     @RequestMapping(value = "/batchData",method = RequestMethod.DELETE)
     public JsonResult bulkDel(@RequestParam(value = "oids") List<String> oids){
         JsonResult jsonResult = new JsonResult();
@@ -418,7 +426,17 @@ public class DataContainerController {
         return jsonResult;
     }
 
-    //接口6 无需配置文件上传接口,兼容数据交换
+    /**
+     * 无需配置文件上传接口,兼容数据交换
+     * @param files 待上传的文件
+     * @param uploadName 文件名，字段非必需
+     * @param userName 用户名，字段非必需
+     * @param serverNode 服务节点，字段非必需
+     * @param origination 组织，字段非必需
+     * @param datatag tag其他信息，为兼容源哥数据交换容器，字段非必需
+     * @return 上传结果，含有上传后的文件uid
+     * @throws IOException 异常处理
+     */
     @RequestMapping(value = "/data", method = RequestMethod.POST)
     public JsonResult dataNoneConfig(@RequestParam(value = "datafile", required = false)MultipartFile[] files,
                                  @RequestParam(value = "name", required = false)String uploadName,
@@ -433,12 +451,6 @@ public class DataContainerController {
         Date now = new Date();
         BulkDataLink bulkDataLink = new BulkDataLink();
         String uuid = UUID.randomUUID().toString();
-        //参数检验 不需要检验了，兼容没有的
-//        if (uploadName.trim().equals("")||userName.trim().equals("")||serverNode.trim().equals("")||origination.trim().equals("")){
-//            jsonResult.setCode(-1);
-//            jsonResult.setMessage("without name or userId or origination or serverNode");
-//            return jsonResult;
-//        }
         String ogmsPath;
         ogmsPath = resourcePath + "/" + uuid;
         //文件检验
@@ -470,7 +482,13 @@ public class DataContainerController {
         return jsonResult;
     }
 
-    //可视化接口
+    /**
+     * 可视化接口
+     * @param uid 待可视化的文件，是最初始的接口，目前可以考虑废弃
+     * @param response 可视化结果
+     * @param type 在此接口字符非必需，为展示文件的类型
+     * @throws Exception 异常处理
+     */
     @RequestMapping(value = "/data/{uid}/preview", method = RequestMethod.GET)
     public void visual(@PathVariable(value = "uid") String uid,HttpServletResponse response,
                        @RequestParam(value = "type", required = false) String type) throws Exception {
@@ -563,7 +581,12 @@ public class DataContainerController {
         }
     }
 
-    //增加可视化方法
+    /**
+     * 增加可视化方法
+     * @param oid 可视化方法id
+     * @param category 可视化类别
+     * @return 增加结果
+     */
     @RequestMapping(value = "/addVisual", method = RequestMethod.POST)
     public JsonResult addVisual(@RequestParam(value = "oid") String oid,
                                 @RequestParam(value = "category") String category) {
@@ -578,7 +601,14 @@ public class DataContainerController {
         return jsonResult;
     }
 
-    //断点续传接口Breakpoint continuation
+    /**
+     * 断点续传接口Breakpoint continuation，但此接口在服务器端使用不合适，也待废弃
+     * @param oid 待续传的文件oid
+     * @param savePath 存储路径
+     * @param response 返回值
+     * @throws IOException 异常处理
+     * @throws InterruptedException 异常处理
+     */
     @RequestMapping(value = "/dataBPContinue", method = RequestMethod.GET)
     public void dataBPContinue(@RequestParam(value = "oid") String oid,
                                @RequestParam(value = "savePath") String savePath,
@@ -588,9 +618,13 @@ public class DataContainerController {
         downLoadLog = dataContainer.downBPContinue(oid,savePath,response);
     }
 
-    //以本名上传
-
-    //新增dataTemplateId接口
+    /**
+     * 编辑dataTemplateId接口，可新增也可以编辑
+     * @param oid 数据oid
+     * @param templateId 模板id
+     * @param type 编辑或者新增
+     * @return 编辑结果
+     */
     @RequestMapping(value = "/editTemplateId",method = RequestMethod.POST)
     public JsonResult addTemplateId(@RequestParam(value = "oid") String oid,
                                     @RequestParam(value = "templateId") String templateId,
@@ -632,7 +666,11 @@ public class DataContainerController {
         }
     }
 
-    //全局搜索功能
+    /**
+     * 全局搜索功能
+     * @param name 文件名
+     * @return 搜索到的文件信息
+     */
     @RequestMapping(value = "/globalSearch", method = RequestMethod.GET)
     public JsonResult globalSearch(@RequestParam(value = "name") String name){
         JsonResult result = new JsonResult();
@@ -654,7 +692,11 @@ public class DataContainerController {
         return result;
     }
 
-    //获取元数据接口
+    /**
+     * 获取元数据接口
+     * @param dataId 数据id
+     * @return 数据元数据信息
+     */
     @RequestMapping(value = "/data/{uid}/metadata", method = RequestMethod.GET)
     public JsonResult getMetaData(@PathVariable(value = "uid") String dataId){
         JsonResult jsonResult = new JsonResult();
@@ -678,7 +720,12 @@ public class DataContainerController {
         }
     }
 
-    //大文件上传至ftp服务器
+    /**
+     * 大文件上传到ftp服务器
+     * @param file 大文件
+     * @return 上传结果
+     * @throws IOException 异常处理
+     */
     @RequestMapping(value = "/uploadBigFile", method = RequestMethod.POST)
     public JsonResult uploadBigFile(@RequestParam(value = "bigFile") MultipartFile file) throws IOException {
         JsonResult result = new JsonResult();
@@ -692,8 +739,14 @@ public class DataContainerController {
         return result;
     }
 
-
-    //大文件下载
+    /**
+     * 大文件下载
+     * @param fileName 下载时文件名
+     * @param type 文件类型，不必需
+     * @param response response
+     * @return 下载结果
+     * @throws UnsupportedEncodingException 异常处理
+     */
     @RequestMapping(value = "/downloadBigFile", method = RequestMethod.GET)
     public JsonResult downloadBigFile(@RequestParam(value = "fileName") String fileName,
                                       @RequestParam(value = "type", required = false) String type,
@@ -725,70 +778,6 @@ public class DataContainerController {
         return result;
     }
 
-//    @RequestMapping(value = "/getPortal", method = RequestMethod.GET)
-//    public JsonResult getPortal(){
-//        JsonResult jsonResult = new JsonResult();
-//
-//        //拿到门户用户数据id
-//        List<String> urls = new ArrayList<>();
-//        List<User> users = userDao.findAll();
-//        for (User user:users){
-//            List<FileMeta> fileMetas = user.getFileContainer();
-//            if (fileMetas == null){
-//                continue;
-//            }else {
-//                for(FileMeta fileMeta:fileMetas){
-//                    if (fileMeta.getUrl().equals("")||fileMeta.getUrl() == null){
-//                        continue;
-//                    }else {
-////                        String oid = fileMeta.getUrl().split("=")[1];
-//                        urls.add(fileMeta.getUrl());
-//                    }
-//                }
-//            }
-//        }
-//
-//        jsonResult.setData(urls);
-//        return jsonResult;
-//    }
-//
-//    @RequestMapping(value = "/getTask", method = RequestMethod.GET)
-//    public JsonResult getTask(){
-//        JsonResult jsonResult = new JsonResult();
-//
-//        //拿到门户用户数据id
-//        List<String> urls = new ArrayList<>();
-//        List<Task> tasks = taskDao.findAll();
-//        HashSet<String> userId = new HashSet<>();
-////        for (Task task : tasks){
-////            if(task.getStatus() == 2){
-////                userId.add(task.getUserId());
-////            }
-////        }
-//        for (Task task : tasks){
-//            if(task.getStatus() == 2&&(task.getUserId().equals("wxsh@cugb.edu.cn")||task.getUserId().equals("641597542@qq.com")
-//                    ||task.getUserId().equals("786872808@qq.com")||task.getUserId().equals("chenmin")
-//                    ||task.getUserId().equals("wutingxin1998@gmail.com")||task.getUserId().equals("1061401953@qq.com")
-//                    ||task.getUserId().equals("Xun Shi")||task.getUserId().equals("1245181489@qq.com")
-//                    ||task.getUserId().equals("hqsong@henu.edu.cn")||task.getUserId().equals("xinyue.ye@njit.edu")||
-//                    task.getUserId().equals("yuesongshan")||task.getUserId().equals("zhengzhong2020@qq.com")
-//                    ||task.getUserId().equals("wxc627684875")||task.getUserId().equals("chenmin0902@163.com")
-//                    ||task.getUserId().equals("songc@lreis.ac.cn")||task.getUserId().equals("473701638@qq.com")
-//                    ||task.getUserId().equals("307338820@qq.com")||task.getUserId().equals("1643696225@qq.com")
-//                    ||task.getUserId().equals("lihongyi@lzb.ac.cn")||task.getUserId().equals("Wtian@lzu.edu.cn"))){
-//                List<TaskData> inputs = task.getInputs();
-//                for (TaskData taskData : inputs){
-//                    urls.add(taskData.getUrl());
-//                }
-//            }else {
-//                continue;
-//            }
-//        }
-//
-//        jsonResult.setData(urls);
-//        return jsonResult;
-//    }
-
     /**
      * 将数据库字段有用的进行迁移
      * @param oid 待迁移的BulkDataLink2的id
@@ -810,9 +799,10 @@ public class DataContainerController {
         return jsonResult;
     }
 
-//    /**
-//     *
-//     */
+    /**
+     * 寻找com文件名为空的条目（测试接口，用于排bug）
+     * @return 文件名为空的条目
+     */
     @RequestMapping(value = "/findComNameNone", method = RequestMethod.GET)
     public ArrayList<String> findComNameNone(){
         List<DataListCom> dataListComs = dataListComDao.findAll();
@@ -825,7 +815,6 @@ public class DataContainerController {
         }
         return list;
     }
-
 
     /**
      * 75容器中转接口，将75页面的数据存储到本服务器本地，将数据路径返回
@@ -857,7 +846,12 @@ public class DataContainerController {
         return jsonResult;
     }
 
-
+    /**
+     * 下载文件并解压，此为作为门户数据容器的中转接口
+     * @param files 文件
+     * @return 是否上传并解压成功
+     * @throws Exception 异常处理
+     */
     @RequestMapping(value = "/dataDownloadAndCpmpress", method = RequestMethod.POST)
     public JsonResult dataDownloadAndCpmpress(@RequestParam(value = "resources", required = false)MultipartFile[] files) throws Exception {
         JsonResult jsonResult = new JsonResult();
@@ -920,9 +914,9 @@ public class DataContainerController {
     }
 
     /**
-     * 75容器中转接口，将绑定好的数据删除
-     * @param filesUrl
-     * @return
+     * 75容器中转接口，将绑定好的数据删除，coding
+     * @param filesUrl 文件url
+     * @return 删除结果
      */
     @RequestMapping(value = "/dataDelete", method = RequestMethod.POST)
     public JsonResult dataDelete(@RequestParam(value = "datafileUrl", required = false)String[] filesUrl) {
