@@ -1,7 +1,7 @@
 
 # DataContainer
 @[TOC]
-## 批量上传接口
+## 批量上传接口(需要上传配置文件)
 * 请求方式
 ```POST```
 * 接口参数
@@ -17,8 +17,8 @@
 
 * 接口示例
 ```
-curl --location --request POST 'http://221.226.60.2:8082/data' \
---form 'ogmsdata=@/path/to/file' \
+curl --location --request POST 'http://221.226.60.2:8082/configData' \
+--form 'datafile=@/path/to/file' \
 --form 'name=test' \
 --form 'userId=1' \
 --form 'serverNode=china' \
@@ -26,24 +26,56 @@ curl --location --request POST 'http://221.226.60.2:8082/data' \
 ```
 * 返回值
 ```json
-{"code":0,"msg":"success","data":{"file_name":"test","source_store_id":"893b08ef-73ab-4d29-aaa9-239bc3115001"}}
+{"code":1,"message":"upload file success!","data":{"file_name":"test","source_store_id":"6d8b9bad-59f3-495b-9d74-41159f7f4049"},"result":"suc"}
 ```
 ## 下载接口
 * 请求方式
 ```GET```
 * 接口参数
-```PARAMS```
-*************
+**************
 | 字段  |示例值  |
 |---|--|
-|uid|0b86cb92-4380-4075-b6bb-a9a3ac94ad07  |
-
+|id|0b86cb92-4380-4075-b6bb-a9a3ac94ad07  |
+* URL
+URL : /data/[id]
 * 接口示例
 ```
-http://221.226.60.2:8082/data?uid=0b86cb92-4380-4075-b6bb-a9a3ac94ad07
+http://221.226.60.2:8082/data/0b86cb92-4380-4075-b6bb-a9a3ac94ad07
 ```
 * 返回值
 下载的数据，无返回值
+## 数据展示接口（下载接口加上信息过滤）
+* 请求方式
+```GET```
+* 接口参数
+**************
+| 字段  |示例值  |
+|---|--|
+|id|6649b522-4803-4202-83f4-8c9532c062d5  |
+|type|html|
+* URL
+URL : /data/[id]?type=[file type]
+* 接口示例
+```
+http://221.226.60.2:8082/data/6649b522-4803-4202-83f4-8c9532c062d5?type=html
+```
+* 支持的为HTTP支持的ContentType
+    HTML(0, "text/html;charset=utf-8"),
+    Plain(1, "text/plain"),
+    XML(2, "text/xml"),
+    GIF(3, "image/gif"),
+    JPG(4, "image/jpeg"),
+    PNG(5, "image/png"),
+    XHTML(6, "application/xhtml+xml"),
+    XML_DATA(6, "application/xml"),
+    Atom_XML(6, "application/atom+xml"),
+    JSON(6, "application/json"),
+    PDF(6, "application/pdf"),
+    WORD(6, "application/msword"),
+    OCTET_STREAM(6, "application/octet-stream"),
+    X_WWW_FORM_URLENCODED(6, "application/x-www-form-urlencoded ");
+* 返回值
+页面展示文件内容，例如type为html则不下载数据，展示为网页
 ## 批量下载接口
 * 请求方式
 ```GET```
@@ -56,7 +88,7 @@ http://221.226.60.2:8082/data?uid=0b86cb92-4380-4075-b6bb-a9a3ac94ad07
 
 * 接口示例
 ```
-http://221.226.60.2:8082/bulkDownload?oids=0b86cb92-4380-4075-b6bb-a9a3ac94ad07,0f6dfa51-ae74-4295-98f4-96f49a17350b
+http://221.226.60.2:8082/batchData?oids=0b86cb92-4380-4075-b6bb-a9a3ac94ad07,0f6dfa51-ae74-4295-98f4-96f49a17350b
 ```
 * 返回值
 下载的zip包，无返回值
@@ -64,22 +96,23 @@ http://221.226.60.2:8082/bulkDownload?oids=0b86cb92-4380-4075-b6bb-a9a3ac94ad07,
 * 请求方式
 ```DELETE```
 * 接口参数
-```PARAMS```
-*************
+**************
 | 字段  |示例值  |
 |---|--|
 |uid|893b08ef-73ab-4d29-aaa9-239bc3115001  |
-
+* URL
+URL : /data/[id]
 * 接口示例
 ```
-http://221.226.60.2:8082/del?uid=0b86cb92-4380-4075-b6bb-a9a3ac94ad07
+http://221.226.60.2:8082/data/0b86cb92-4380-4075-b6bb-a9a3ac94ad07
 ```
 * 返回值
 ```json
 {
-    "code": 0,
-    "msg": "delete success",
-    "data": null
+    "code": 1,
+    "message": "delete file success",
+    "data": "",
+    "result": "suc"
 }
 ```
 ## 批量删除接口
@@ -93,14 +126,15 @@ http://221.226.60.2:8082/del?uid=0b86cb92-4380-4075-b6bb-a9a3ac94ad07
 |oids|b5d92fa5-edf8-4385-aaa9-d2015928a047,92614796-6a5d-4467-b2e2-959dcaa59016  |
 * 接口示例
 ```
-http://221.226.60.2:8082/bulkDel?oids=0b86cb92-4380-4075-b6bb-a9a3ac94ad07,0f6dfa51-ae74-4295-98f4-96f49a17350b
+http://221.226.60.2:8082/batchData?oids=b5d92fa5-edf8-4385-aaa9-d2015928a047,92614796-6a5d-4467-b2e2-959dcaa59016
 ```
 * 返回值
 ```json
 {
-    "code": 0,
-    "msg": "All fail delete success",
-    "data": null
+    "code": 1,
+    "message": "All file delete success",
+    "data": "",
+    "result": "suc"
 }
 ```
 ## 可视化接口
@@ -132,8 +166,8 @@ http://221.226.60.2:8082/visual?uid=e684ef96-cbad-468d-853e-e80fe157fbf5
 | origination|developer|
 * 接口示例
 ```
-curl --location --request POST 'http://221.226.60.2:8082/dataNoneConfig' \
---form 'ogmsdata=@/path/to/file' \
+curl --location --request POST 'http://221.226.60.2:8082/data' \
+--form 'datafile=@/path/to/file' \
 --form 'name=test' \
 --form 'userId=1' \
 --form 'serverNode=china' \
@@ -141,14 +175,7 @@ curl --location --request POST 'http://221.226.60.2:8082/dataNoneConfig' \
 ```
 * 返回值
 ```json
-{
-    "code": 0,
-    "msg": "success",
-    "data": {
-        "file_name": "test",
-        "source_store_id": "25ec8bd5-0bbc-4507-a6b4-2473cb99e970"
-    }
-}
+{"code":1,"message":"upload file success!","data":{"file_name":"test","source_store_id":"6d8b9bad-59f3-495b-9d74-41159f7f4049"},"result":"suc"}
 ```
 ## 更改dataTemplate接口
 * 请求方式
