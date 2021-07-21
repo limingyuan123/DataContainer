@@ -1,14 +1,14 @@
 package njgis.opengms.datacontainer.service;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import njgis.opengms.datacontainer.bean.JsonResult;
-import njgis.opengms.datacontainer.dao.BulkDataLinkDao;
-import njgis.opengms.datacontainer.dao.DataListComDao;
-import njgis.opengms.datacontainer.dao.DataListDao;
-import njgis.opengms.datacontainer.dao.ReferenceZeroTimeDao;
+import njgis.opengms.datacontainer.dao.*;
 import njgis.opengms.datacontainer.entity.BulkDataLink;
 import njgis.opengms.datacontainer.entity.DataListCom;
 import njgis.opengms.datacontainer.entity.ReferenceZeroTime;
+import njgis.opengms.datacontainer.entity.TimeStamp;
 import njgis.opengms.datacontainer.enums.ContentTypeEnum;
 import njgis.opengms.datacontainer.thread.BPContinueThread;
 import njgis.opengms.datacontainer.thread.MergeRunnable;
@@ -17,10 +17,16 @@ import njgis.opengms.datacontainer.thread.UploadThread;
 import njgis.opengms.datacontainer.utils.FileUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import sun.security.timestamp.TSRequest;
 
@@ -56,6 +62,9 @@ public class DataContainer {
 
     @Autowired
     ReferenceZeroTimeDao referenceZeroTimeDao;
+
+    @Autowired
+    TimeStampDao timeStampDao;
 
     @Value("${resourcePath}")
     private String resourcePath;
@@ -1043,5 +1052,62 @@ public class DataContainer {
         }
 
         return isDownload;
+    }
+
+
+    /**
+     * 每周备份数据库
+     */
+    @Scheduled(cron = "*/5 * * * * ?")
+    //部署时解开，每月一号凌晨一点
+//    @Scheduled(cron = "0 0 1 1 * ?")
+    private void CopyDatabase(){
+        OperationCopy();
+    }
+    private void OperationCopy(){
+        List<BulkDataLink> bulkDataLinks = bulkDataLinkDao.findAll();
+
+        //init
+        TimeStamp newTime = new TimeStamp();
+        Date date = new Date();
+        newTime.setTime(date);
+        timeStampDao.insert(newTime);
+
+//        List<TimeStamp> dates = timeStampDao.findAll();
+//        TimeStamp timeStamp = dates.get(dates.size()-1);
+//        Date preTime = timeStamp.getTime();
+//        JSONArray bulk = new JSONArray();
+//        JSONArray com = new JSONArray();
+//        for(int i=bulkDataLinks.size()-1;i>=0;i--){
+//            if(bulkDataLinks.get(i).getDate().compareTo(preTime) > 0){
+//                bulk.add(bulkDataLinks.get(i));
+//                List<String> dataOids = bulkDataLinks.get(i).getDataOids();
+//                for(String dataOid:dataOids){
+//                    com.add(dataListComDao.findFirstByOid(dataOid));
+//                }
+//            }else {
+//                break;
+//            }
+//        }
+//        String url = "http://221.226.60.2:8088/copyDataContainerBase";
+//        String response = null;
+//        MultiValueMap<String, Object> part = new LinkedMultiValueMap<>();
+//        part.add("bulk", bulk);
+//        part.add("com", com);
+//        HttpHeaders headers = new HttpHeaders();
+//        headers.add("Content-Type", "application/json");
+//        HttpEntity<MultiValueMap> requestEntity = new HttpEntity<MultiValueMap>(part, headers);
+//        RestTemplate restTemplate = new RestTemplate();
+//        try {
+//            response = restTemplate.postForObject(url, requestEntity, String.class);
+//        } catch (ResourceAccessException e){
+//            log.info("code: 1, request timeout!");
+//        }
+//        log.info(response);
+//        TimeStamp timeStamp1 = dates.get(dates.size()-1);
+//        //更新时间戳时间
+////        timeStamp1.setTime(new Date());
+////        dates.set(dates.size()-1, timeStamp1);
+//        timeStampDao.save(timeStamp1);
     }
 }
